@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+"""from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Component, ComponentState, ActionType
@@ -40,4 +40,9 @@ class ComponentViewSet(viewsets.ModelViewSet):
             return Response(
                 {'error': 'Invalid action type'},
                 status=status.HTTP_400_BAD_REQUEST
-            )
+            )"""
+
+from django.http import HttpResponse
+
+def device_home(request):
+    return HttpResponse("💡 I am the Devices Views!")

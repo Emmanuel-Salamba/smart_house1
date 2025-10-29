@@ -1,3 +1,4 @@
-from django.shortcuts import render
+from django.http import HttpResponse
 
-# Create your views here.
+def house_home(request):
+    return HttpResponse("🏠 I am the Houses Views!")

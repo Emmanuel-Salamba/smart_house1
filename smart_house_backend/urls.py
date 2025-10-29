@@ -31,9 +31,9 @@ from django.urls import include, path
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/devices/', include('devices.urls')),
+   """ path('api/devices/', include('devices.urls')),
     path('api/users/', include('users.urls')),
     path('api/houses/', include('houses.urls')),
     path('api/activities/', include('activities.urls')),
-    path('forest/', include('forestadmin.django_agent.urls')),
+    path('forest/', include('forestadmin.django_agent.urls')),"""
 ]
