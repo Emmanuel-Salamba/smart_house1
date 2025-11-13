@@ -1,16 +1,67 @@
-# .gitignore (Django)
+# .gitignore (Django) - Security Enhanced
 *.pyc
 __pycache__/
 *.pyo
 *.pyd
+.Python
+
+# Virtual environments
 env/
 venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables (CRITICAL)
 .env
-db.sqlite3
-media/
-*.log
+.env.local
+.env.prod
+.env.bak
+
+# Database
+*.sqlite3
+*.db
+
+# Static/media files (generated)
 /staticfiles/
-.idea/
+/mediafiles/
+media/
+
+# IDE
 .vscode/
-node_modules/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+
+# Build/distribution
+*.egg-info/
+build/
+dist/
+
+# Jupyter
+.ipynb_checkpoints
+
+# Frontend
+node_modules/
+
+# PyInstaller
+*.spec

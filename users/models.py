@@ -9,6 +9,16 @@ class CustomUserManager(BaseUserManager):
         if not email:
             raise ValueError('The Email field must be set')
         email = self.normalize_email(email)
+        
+        # Set default user_type if not provided
+        if 'user_type' not in extra_fields:
+            # Get or create a default UserType for regular users
+            user_type, created = UserType.objects.get_or_create(
+                name='user',
+                defaults={'description': 'Regular user'}
+            )
+            extra_fields['user_type'] = user_type
+        
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -23,6 +33,14 @@ class CustomUserManager(BaseUserManager):
             raise ValueError('Superuser must have is_staff=True.')
         if extra_fields.get('is_superuser') is not True:
             raise ValueError('Superuser must have is_superuser=True.')
+
+        # Set admin user_type for superuser
+        if 'user_type' not in extra_fields:
+            user_type, created = UserType.objects.get_or_create(
+                name='admin',
+                defaults={'description': 'Administrator'}
+            )
+            extra_fields['user_type'] = user_type
 
         return self.create_user(email, password, **extra_fields)
 
