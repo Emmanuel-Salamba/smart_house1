@@ -32,7 +32,8 @@ INSTALLED_APPS = [
     'users',
     'houses',
     'devices',
-    'activities',  # Changed from 'activity' to match your folder name
+    'automation',
+    'activities',  
 ]
 
 MIDDLEWARE = [
