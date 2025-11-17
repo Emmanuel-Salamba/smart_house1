@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,10 +24,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # Third party apps
-    'rest_framework',
-    #'forestadmin.django_agent',
-    'corsheaders',
     'channels',
+    'rest_framework',
+    'corsheaders',
+    #'forestadmin.django_agent',
 
     # Local apps
     'users',
@@ -65,7 +66,11 @@ TEMPLATES = [
     },
 ]
 
+# WSGI for traditional HTTP
 WSGI_APPLICATION = 'smart_house_backend.wsgi.application'
+
+# ASGI for WebSocket support
+ASGI_APPLICATION = 'smart_house_backend.asgi.application'
 
 # Database
 # Using SQLite for simplicity - change to PostgreSQL when ready
@@ -116,17 +121,31 @@ STATIC_URL = 'static/'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Add REST framework configuration
+# REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',  # Keep for admin interface
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
-# CORS settings for mobile app
+# JWT Settings
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+}
+
+# CORS settings for mobile app and frontend
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React Native development
     "http://127.0.0.1:3000",
+    "http://localhost:8000",  # Django development server
+    "http://127.0.0.1:8000",
 ]
 
 # CORS settings for Forest Admin
@@ -136,10 +155,80 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 CORS_ALLOW_CREDENTIALS = True
 
 # Channels configuration for WebSocket (ESP32 communication)
-ASGI_APPLICATION = 'smart_house_backend.asgi.application'
-
+# For development - using InMemoryChannelLayer
+# For production - use Redis as shown below
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
+
+# For production with Redis, uncomment and install channels-redis:
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             "hosts": [('127.0.0.1', 6379)],
+#         },
+#     },
+# }
+
+# WebSocket and command timeout settings
+COMMAND_TIMEOUT = 30  # seconds to wait for microcontroller ACK
+
+# Cache configuration (required for command buffering)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
+# For production with Redis cache, uncomment:
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django_redis.cache.RedisCache',
+#         'LOCATION': 'redis://127.0.0.1:6379/1',
+#         'OPTIONS': {
+#             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+#         }
+#     }
+# }
+
+# Security settings for production (commented out for development)
+# SECURE_SSL_REDIRECT = True
+# SESSION_COOKIE_SECURE = True
+# CSRF_COOKIE_SECURE = True
+# SECURE_BROWSER_XSS_FILTER = True
+# SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': 'smart_house.log',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django.channels': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'devices': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
     },
 }
