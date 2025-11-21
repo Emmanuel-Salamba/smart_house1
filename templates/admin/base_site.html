@@ -4,27 +4,8 @@
 {% block title %}{{ title }} | Smart Home Admin{% endblock %}
 
 {% block extrastyle %}
-{{ block.super }}
-<link rel="stylesheet" type="text/css" href="{% static 'css/custom.css' %}">
-<style>
-    /* Additional admin styling */
-    #header {
-        background: #417690;
-        color: #fff;
-    }
-    
-    .module h2, .module caption, .inline-group h2 {
-        background: #417690;
-    }
-    
-    .button, input[type=submit], input[type=button], .submit-row input, a.button {
-        background: #417690;
-    }
-    
-    .button:hover, input[type=submit]:hover, input[type=button]:hover {
-        background: #305067;
-    }
-</style>
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/custom.css' %}">
 {% endblock %}
 
 {% block branding %}
