@@ -1,0 +1,39 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | Smart Home Admin{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" type="text/css" href="{% static 'css/custom.css' %}">
+<style>
+    /* Additional admin styling */
+    #header {
+        background: #417690;
+        color: #fff;
+    }
+    
+    .module h2, .module caption, .inline-group h2 {
+        background: #417690;
+    }
+    
+    .button, input[type=submit], input[type=button], .submit-row input, a.button {
+        background: #417690;
+    }
+    
+    .button:hover, input[type=submit]:hover, input[type=button]:hover {
+        background: #305067;
+    }
+</style>
+{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">
+    <a href="{% url 'admin:index' %}">
+        <img src="{% static 'images/logo.png' %}" alt="Logo" height="40" style="margin-right: 10px;">
+        Smart Home Administration
+    </a>
+</h1>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
