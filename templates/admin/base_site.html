@@ -5,13 +5,17 @@
 
 {% block extrastyle %}
     {{ block.super }}
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
+
     <link rel="stylesheet" type="text/css" href="{% static 'css/custom.css' %}">
 {% endblock %}
 
 {% block branding %}
 <h1 id="site-name">
     <a href="{% url 'admin:index' %}">
-        <img src="{% static 'images/logo.png' %}" alt="Logo" height="40" style="margin-right: 10px;">
+        <img src="{% static 'images/logo2.png' %}" alt="Logo" height="50" style="margin-right: 10px;">
         Smart Home Administration
     </a>
 </h1>
