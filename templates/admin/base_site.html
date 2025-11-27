@@ -5,20 +5,30 @@
 
 {% block extrastyle %}
     {{ block.super }}
-    
+
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
-
+    
+    <!-- Custom Admin Styles -->
     <link rel="stylesheet" type="text/css" href="{% static 'css/custom.css' %}">
 {% endblock %}
 
 {% block branding %}
-<h1 id="site-name">
+<h1 id="site-name" class="admin-title-animation">
     <a href="{% url 'admin:index' %}">
-        <img src="{% static 'images/logo2.png' %}" alt="Logo" height="50" style="margin-right: 10px;">
-        Smart Home Administration
+        <img src="{% static 'images/logo2.png' %}" 
+             alt="Logo" 
+             height="50"
+             style="margin-right: 10px;">
+        <span>Smart Home Administration</span>
     </a>
 </h1>
 {% endblock %}
 
 {% block nav-global %}{% endblock %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <script src="{% static 'js/admin-anim.js' %}"></script>
+{% endblock %}
+

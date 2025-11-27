@@ -1,3 +1,35 @@
+/* ===== HEADER ANIMATION FOR ADMIN DASHBOARD ===== */
+
+.admin-title-animation {
+    animation: fadeSlideIn 1.2s ease-out forwards;
+    opacity: 0;
+}
+
+.admin-logo-animation {
+    animation: fadeIn 1.5s ease-in forwards;
+    opacity: 0;
+}
+
+@keyframes fadeSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-15px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
 /* ===== MODERN SMART HOME COLOR THEME ===== */
 :root {
     --primary-color: #2c5530;      /* Deep forest green */
@@ -321,3 +353,24 @@ a:hover {
         font-size: 2rem;
     }
 }
+
+/* ===== SHAKE ANIMATION FOR ADMIN INDEX BARS ===== */
+@keyframes shake {
+    0% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+    100% { transform: translateX(0); }
+}
+
+/* Apply shake on hover to model links on admin index page */
+tr[class^="model-"] th a {
+    display: inline-block; /* necessary for transform */
+    transition: transform 0.2s ease-in-out;
+}
+
+tr[class^="model-"] th a:hover {
+    animation: shake 0.5s;
+}
+    
