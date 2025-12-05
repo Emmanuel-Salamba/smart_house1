@@ -78,7 +78,7 @@ div.breadcrumbs, .selector-chosen h2,
     color: var(--accent-color) !important; /* Yellow/gold text */
     border: none !important;
     border-radius: 6px !important;
-    padding: 10px 15px !important;
+    padding: 7px 15px !important;
     font-weight: 600 !important;
     transition: all 0.3s ease !important;
     box-shadow: 0 2px 10px rgba(44, 85, 48, 0.3) !important;
