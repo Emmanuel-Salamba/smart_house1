@@ -135,6 +135,7 @@ fieldset.module h2 {
 thead th {
     background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)) !important;
     color: var(--accent-color) !important;
+
 }
 
 /* 8. SELECTED ITEMS */
@@ -508,3 +509,5 @@ thead th,
         font-size: 2rem;
     }
 }
+
+

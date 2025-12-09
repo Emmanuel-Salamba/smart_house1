@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from houses.models import House
+import secrets  # Already imported at the top
 
 
 class ComponentType(models.Model):
@@ -96,12 +97,27 @@ class Microcontroller(models.Model):
     last_heartbeat = models.DateTimeField(null=True, blank=True)
     heartbeat_interval = models.IntegerField(default=60)  # seconds
 
-    # Security
-    api_key = models.CharField(max_length=100, unique=True, db_index=True)
+    # Security - MODIFIED THIS FIELD
+    api_key = models.CharField(
+        max_length=100, 
+        unique=True, 
+        db_index=True,
+        blank=True,      # Allow blank in forms
+        null=True,       # Allow null in database
+        help_text="Leave empty to auto-generate"
+    )
     is_approved = models.BooleanField(default=False)  # Manual approval for security
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # ADD THIS METHOD for auto-generating API keys
+    def save(self, *args, **kwargs):
+        """Save method with auto-generated API key"""
+        # Generate API key ONLY if it doesn't exist
+        if not self.api_key:
+            self.api_key = secrets.token_urlsafe(32)
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = 'microcontroller'
