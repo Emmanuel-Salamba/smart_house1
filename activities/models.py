@@ -1,6 +1,7 @@
 import uuid
+import json
 from django.db import models
-from django.contrib.postgres.fields import JSONField  # Use models.JSONField if not using PostgreSQL
+from django.core.serializers.json import DjangoJSONEncoder
 from users.models import User
 from houses.models import House
 from devices.models import Component, ActionType
@@ -8,10 +9,22 @@ from devices.models import Component, ActionType
 
 class ActivityLog(models.Model):
     LOG_LEVELS = [
+        ('debug', 'Debug'),
         ('info', 'Info'),
         ('warning', 'Warning'),
         ('error', 'Error'),
         ('security', 'Security'),
+    ]
+
+    SOURCE_TYPES = [
+        ('mobile_app', 'Mobile App'),
+        ('web_app', 'Web App'),
+        ('api', 'API'),
+        ('microcontroller', 'Microcontroller'),
+        ('physical_switch', 'Physical Switch'),
+        ('automation', 'Automation'),
+        ('admin', 'Admin Panel'),
+        ('system', 'System'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -19,26 +32,37 @@ class ActivityLog(models.Model):
     # Relationships
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
     house = models.ForeignKey(House, on_delete=models.CASCADE, related_name='activities')
-    component = models.ForeignKey(Component, on_delete=models.CASCADE, null=True, blank=True, related_name='activities')
+    component = models.ForeignKey(Component, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='activities')
     action_type = models.ForeignKey(ActionType, on_delete=models.PROTECT, null=True, blank=True,
                                     related_name='activities')
 
     # Action details
     action_name = models.CharField(max_length=100)
-    action_parameters = models.JSONField(default=dict)
-    action_result = models.JSONField(default=dict)
+    action_parameters = models.JSONField(default=dict, encoder=DjangoJSONEncoder)
+    action_result = models.JSONField(default=dict, encoder=DjangoJSONEncoder)
 
     # Log metadata
     log_level = models.CharField(max_length=10, choices=LOG_LEVELS, default='info')
+    source = models.CharField(max_length=20, choices=SOURCE_TYPES, default='api')
+
+    is_automated = models.BooleanField(default=False)
+    automation_source = models.CharField(max_length=100, blank=True)
+    # Technical details
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(blank=True)
+    request_path = models.CharField(max_length=500, blank=True)
+
+    # Performance metrics (optional)
+    execution_time = models.FloatField(null=True, blank=True)  # in seconds
+    memory_usage = models.IntegerField(null=True, blank=True)  # in bytes
+
+    # Status
+    status_code = models.IntegerField(null=True, blank=True)  # HTTP status or custom code
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
-
-    # For automated actions
-    is_automated = models.BooleanField(default=False)
-    automation_source = models.CharField(max_length=100, blank=True)  # Which automation triggered this
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'activity_log'
@@ -50,6 +74,7 @@ class ActivityLog(models.Model):
             models.Index(fields=['component', 'created_at']),
             models.Index(fields=['created_at']),
             models.Index(fields=['log_level', 'created_at']),
+            models.Index(fields=['source', 'created_at']),
         ]
         ordering = ['-created_at']
 
