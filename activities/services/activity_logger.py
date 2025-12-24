@@ -1,9 +1,10 @@
 import json
 import time
+import traceback
 from datetime import datetime
 from django.utils import timezone
 from django.core.serializers.json import DjangoJSONEncoder
-from ..models import ActivityLog
+from ..models import ActivityLog, ActionType
 
 
 class ActivityLogger:
@@ -251,11 +252,37 @@ class ActivityLogger:
         Create the actual ActivityLog entry
         """
         try:
+            # Handle action_type - it could be ActionType instance or string
+            action_type_value = log_data.get('action_type')
+            action_type_instance = None
+
+            if action_type_value:
+                if isinstance(action_type_value, ActionType):
+                    # It's already an ActionType instance
+                    action_type_instance = action_type_value
+                elif hasattr(action_type_value, 'name'):
+                    # It has a .name attribute (might be ActionType instance)
+                    try:
+                        action_type_instance = ActionType.objects.filter(name=action_type_value.name).first()
+                    except:
+                        # If that fails, try to find by string
+                        try:
+                            action_type_instance = ActionType.objects.filter(name=str(action_type_value)).first()
+                        except:
+                            pass
+                else:
+                    # It's a string or something else
+                    try:
+                        action_type_instance = ActionType.objects.filter(name=str(action_type_value)).first()
+                    except:
+                        pass
+
+            # Create the log entry
             return ActivityLog.objects.create(
                 user=log_data.get('user'),
                 house=log_data.get('house'),
                 component=log_data.get('component'),
-                action_type=log_data.get('action_type'),
+                action_type=action_type_instance,  # Pass the instance or None
                 action_name=log_data.get('action_name'),
                 action_parameters=log_data.get('action_parameters', {}),
                 action_result=log_data.get('action_result', {}),
@@ -270,4 +297,6 @@ class ActivityLogger:
         except Exception as e:
             # Fallback logging if primary logging fails
             print(f"Failed to create activity log: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
+            print(f"Log data that failed: {log_data}")
             return None
