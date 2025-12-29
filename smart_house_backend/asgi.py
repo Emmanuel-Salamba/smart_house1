@@ -1,21 +1,28 @@
 import os
 from django.core.asgi import get_asgi_application
-from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
-from channels.security.websocket import AllowedHostsOriginValidator
-import devices.routing
-import activities.routing
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'smart_house_backend.settings')
 
-application = ProtocolTypeRouter({
-    "http": get_asgi_application(),
-    "websocket": AllowedHostsOriginValidator(
-        AuthMiddlewareStack(
-            URLRouter(
-                devices.routing.websocket_urlpatterns +
-                activities.routing.websocket_urlpatterns
+# Check if we're on Vercel (no WebSocket support)
+if os.environ.get('VERCEL') == '1':
+    # On Vercel, use standard ASGI without WebSocket support
+    application = get_asgi_application()
+    app = application  # For Vercel compatibility
+else:
+    # Local development with WebSocket support
+    from channels.routing import ProtocolTypeRouter, URLRouter
+    from channels.auth import AuthMiddlewareStack
+    from channels.security.websocket import AllowedHostsOriginValidator
+    import devices.routing
+
+    application = ProtocolTypeRouter({
+        "http": get_asgi_application(),
+        "websocket": AllowedHostsOriginValidator(
+            AuthMiddlewareStack(
+                URLRouter(
+                    devices.routing.websocket_urlpatterns
+                )
             )
-        )
-    ),
-})
+        ),
+    })
+    app = application  # For consistency
