@@ -1,33 +1,50 @@
 import os
-import dj_database_url  # ADDED FOR VERCEL
+import dj_database_url
 from pathlib import Path
 from datetime import timedelta
-import sys  # ADDED FOR VERCEL
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ============================================
+# SECURITY & ENVIRONMENT SETTINGS
+# ============================================
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY',
-                            'django-insecure-g&i8!boiz_q9_#!57n4rt!b@zhmub=r1d*ma+p^+plw22ev5@l')  # UPDATED
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-g&i8!boiz_q9_#!57n4rt!b@zhmub=r1d*ma+p^+plw22ev5@l')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'  # UPDATED
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 AUTH_USER_MODEL = 'users.User'
+
+# ============================================
+# HOST CONFIGURATION
+# ============================================
 
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '0.0.0.0',
-    '.vercel.app',  # ADDED FOR VERCEL
-    '.now.sh',  # ADDED FOR VERCEL
 ]
 
-# Add your domain here if you have a custom domain
-if os.environ.get('CUSTOM_DOMAIN'):  # ADDED FOR VERCEL
+# Add Render external hostname if available
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+# Add Vercel domains (for compatibility)
+if os.environ.get('VERCEL') == '1':
+    ALLOWED_HOSTS.extend(['.vercel.app', '.now.sh'])
+
+# Add custom domain if specified
+if os.environ.get('CUSTOM_DOMAIN'):
     ALLOWED_HOSTS.append(os.environ.get('CUSTOM_DOMAIN'))
 
-# Application definition
+# ============================================
+# APPLICATION DEFINITION
+# ============================================
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -53,7 +70,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # ADDED FOR VERCEL
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -80,14 +97,19 @@ TEMPLATES = [
     },
 ]
 
-# WSGI for traditional HTTP
-WSGI_APPLICATION = 'smart_house_backend.wsgi.application'
+# ============================================
+# WSGI/ASGI CONFIGURATION
+# ============================================
 
-# ASGI for WebSocket support
+WSGI_APPLICATION = 'smart_house_backend.wsgi.application'
 ASGI_APPLICATION = 'smart_house_backend.asgi.application'
 
-# Database - UPDATED FOR VERCEL
-if os.environ.get('DATABASE_URL'):  # Production (Vercel with PostgreSQL)
+# ============================================
+# DATABASE CONFIGURATION
+# ============================================
+
+# Use PostgreSQL if DATABASE_URL is set (Render/Production), otherwise SQLite (Development)
+if os.environ.get('DATABASE_URL'):
     DATABASES = {
         'default': dj_database_url.config(
             default=os.environ.get('DATABASE_URL'),
@@ -96,7 +118,7 @@ if os.environ.get('DATABASE_URL'):  # Production (Vercel with PostgreSQL)
         )
     }
     print("⚡ Using PostgreSQL database from DATABASE_URL")
-else:  # Development (local SQLite)
+else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -105,7 +127,10 @@ else:  # Development (local SQLite)
     }
     print("💻 Using SQLite database for development")
 
-# Password validation
+# ============================================
+# PASSWORD VALIDATION
+# ============================================
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -121,99 +146,143 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# Internationalization
+# ============================================
+# INTERNATIONALIZATION
+# ============================================
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files - UPDATED FOR VERCEL
+# ============================================
+# STATIC & MEDIA FILES
+# ============================================
+
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'  # ADDED FOR VERCEL
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Default primary key field type
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# ============================================
+# DEFAULT PRIMARY KEY FIELD TYPE
+# ============================================
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# REST Framework configuration
+# ============================================
+# REST FRAMEWORK CONFIGURATION
+# ============================================
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.SessionAuthentication',  # For admin interface
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
-# JWT Settings
+# ============================================
+# JWT SETTINGS
+# ============================================
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
 }
 
-# CORS settings for mobile app and frontend
+# ============================================
+# CORS SETTINGS
+# ============================================
+
+# Base CORS settings
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # React Native development
+    "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:8000",  # Django development server
+    "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "https://*.vercel.app",  # ADDED FOR VERCEL
 ]
+
+# For development, allow all origins (adjust for production)
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    # Production CORS settings
+    CORS_ALLOWED_ORIGINS.extend([
+        "https://your-flutter-app-domain.com",  # Your Flutter app domain
+        "https://*.onrender.com",              # Render domains
+        "https://*.vercel.app",                # Vercel domains (for compatibility)
+    ])
 
 # CORS settings for Forest Admin
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r".*\.forestadmin\.com.*",
 ]
+
 CORS_ALLOW_CREDENTIALS = True
+
+# ============================================
+# REDIS & CACHE CONFIGURATION
+# ============================================
+
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
+
+# Cache configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': REDIS_URL,
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'IGNORE_EXCEPTIONS': True,
+        }
+    }
+}
+
+# ============================================
+# CHANNELS & WEBSOCKET CONFIGURATION
+# ============================================
+
+# Check if we're on Vercel (which doesn't support WebSockets)
+IS_VERCEL = os.environ.get('VERCEL') == '1'
+IS_RENDER = RENDER_EXTERNAL_HOSTNAME is not None
+
+if IS_VERCEL:
+    print("⚠️ Vercel detected - WebSockets disabled")
+    # Vercel doesn't support WebSockets, use in-memory layer
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
+else:
+    print("✅ WebSockets enabled for Render/Local")
+    # Render supports WebSockets with Redis
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [REDIS_URL],
+            },
+        },
+    }
+
+# ============================================
+# SECURITY SETTINGS
+# ============================================
 
 # WebSocket and command timeout settings
 COMMAND_TIMEOUT = 30  # seconds to wait for microcontroller ACK
 
-# ============================================
-# DYNAMIC SETTINGS BASED ON ENVIRONMENT
-# ============================================
-
-# Detect if running on Vercel
-IS_VERCEL = os.environ.get('VERCEL') == '1'
-
-if IS_VERCEL:
-    print("🚀 VERCEL PRODUCTION ENVIRONMENT DETECTED")
-
-    # Force production settings
-    DEBUG = False
-
-    # Channels & WebSocket - DISABLED ON VERCEL (not supported)
-    if 'channels' in INSTALLED_APPS:
-        INSTALLED_APPS.remove('channels')
-        print("⚠️ WebSockets disabled (not supported on Vercel)")
-
-    # Use Redis if available for cache
-    if os.environ.get('REDIS_URL'):
-        print("🔗 Using Redis for caching")
-        CACHES = {
-            'default': {
-                'BACKEND': 'django_redis.cache.RedisCache',
-                'LOCATION': os.environ.get('REDIS_URL'),
-                'OPTIONS': {
-                    'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-                    'IGNORE_EXCEPTIONS': True,
-                }
-            }
-        }
-    else:
-        # Use local memory cache on Vercel
-        CACHES = {
-            'default': {
-                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-                'LOCATION': 'unique-snowflake',
-            }
-        }
-
-    # Security settings for production
+# Security settings for production
+if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
@@ -223,44 +292,38 @@ if IS_VERCEL:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     X_FRAME_OPTIONS = 'DENY'
-
-    # Channels configuration (empty on Vercel)
-    CHANNEL_LAYERS = {}
-
 else:
-    print("💻 LOCAL DEVELOPMENT ENVIRONMENT")
-
-    # Development Channels configuration
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels.layers.InMemoryChannelLayer',
-        },
-    }
-
-    # Development cache
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'unique-snowflake',
-        }
-    }
-
     # Development security settings
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
 
-# Logging configuration
+# ============================================
+# LOGGING CONFIGURATION
+# ============================================
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
         },
         'file': {
             'class': 'logging.FileHandler',
             'filename': 'smart_house.log',
+            'formatter': 'verbose',
         },
     },
     'root': {
@@ -268,6 +331,11 @@ LOGGING = {
         'level': 'INFO',
     },
     'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         'django.channels': {
             'handlers': ['console', 'file'],
             'level': 'INFO',
@@ -278,11 +346,59 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
+        'users': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'activities': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 
-# Fix for Vercel deployment - ensure WebSockets are disabled
-if 'test' in sys.argv or 'vercel' in os.environ.get('HOST', ''):
-    if 'channels' in INSTALLED_APPS:
-        INSTALLED_APPS.remove('channels')
-        CHANNEL_LAYERS = {}
+# ============================================
+# ENVIRONMENT DETECTION & LOGGING
+# ============================================
+
+# Log environment information
+print(f"🎯 Environment: {'PRODUCTION' if not DEBUG else 'DEVELOPMENT'}")
+print(f"🔗 ALLOWED_HOSTS: {ALLOWED_HOSTS}")
+print(f"🌐 WebSockets: {'Enabled' if not IS_VERCEL else 'Disabled (Vercel)'}")
+
+if IS_RENDER:
+    print(f"🚀 Render deployment detected: {RENDER_EXTERNAL_HOSTNAME}")
+    print(f"💾 Database: PostgreSQL")
+    print(f"🧠 Cache: Redis")
+elif IS_VERCEL:
+    print("⚡ Vercel deployment detected")
+    print("⚠️ Note: WebSockets not supported on Vercel")
+    print("💾 Database: PostgreSQL")
+    print("🧠 Cache: Redis (if REDIS_URL set)")
+else:
+    print("💻 Local development environment")
+    print("💾 Database: SQLite")
+    print("🧠 Cache: Redis (development)")
+
+# ============================================
+# COMPATIBILITY FIXES
+# ============================================
+
+# Ensure WebSockets are properly disabled on Vercel
+if IS_VERCEL and 'channels' in INSTALLED_APPS:
+    # Keep channels in INSTALLED_APPS but use InMemoryChannelLayer
+    pass
+
+# Fix for test environment
+if 'test' in sys.argv:
+    # Use SQLite for tests
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'test_db.sqlite3',
+    }
+    # Disable caching for tests
+    CACHES['default']['BACKEND'] = 'django.core.cache.backends.dummy.DummyCache'
+    # Use in-memory channel layer for tests
+    CHANNEL_LAYERS['default']['BACKEND'] = 'channels.layers.InMemoryChannelLayer'

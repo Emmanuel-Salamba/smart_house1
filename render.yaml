@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: smart-home-backend
+    env: python
+    region: ohio  # or your preferred region
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn smart_house_backend.wsgi:application --bind 0.0.0.0:$PORT"
+    healthCheckPath: /health/
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smart-home-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: smart-home-redis
+          type: redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: WEB_CONCURRENCY
+        value: 4
+      - key: DEBUG
+        value: false
+
+    autoDeploy: true
+    plan: free  # Start with free, upgrade later
+
+databases:
+  - name: smart-home-db
+    plan: free
+    databaseName: smart_home
+    user: smart_home_user
+
+redis:
+  - name: smart-home-redis
+    plan: free
+    ipAllowList: []  # Allow all (or specify IPs for security)

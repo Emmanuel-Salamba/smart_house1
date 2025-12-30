@@ -3,6 +3,27 @@ from django.urls import path, include
 from django.contrib.auth import views as auth_views  # ← ADD THIS IMPORT
 from rest_framework.routers import DefaultRouter
 from devices.views import ComponentViewSet, MicrocontrollerViewSet, ActionTypeViewSet
+from django.http import JsonResponse
+from django.db import connection
+from django.db.utils import OperationalError
+
+
+def health_check(request):
+    """Health check endpoint for Render"""
+    try:
+        # Check database connection
+        connection.ensure_connection()
+        db_status = "connected"
+    except OperationalError:
+        db_status = "disconnected"
+
+    return JsonResponse({
+        'status': 'healthy',
+        'service': 'Smart Home API',
+        'database': db_status,
+        'timestamp': timezone.now().isoformat()
+    })
+
 
 # REST Framework router for devices API
 router = DefaultRouter()
@@ -13,7 +34,7 @@ router.register(r'action-types', ActionTypeViewSet)
 urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
-    
+    path('health/', health_check, name='health_check'),
     # REST API endpoints (new - for mobile app)
     path('api/', include(router.urls)),
     

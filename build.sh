@@ -1,14 +1,13 @@
 #!/bin/bash
-echo "=== Building Django Project for Vercel ==="
+echo "=== Building Django Project for Render ==="
 
-# Install dependencies
+# Install Python dependencies
 pip install -r requirements.txt
 
 # Collect static files
 python manage.py collectstatic --noinput
 
-# Create necessary directories
-mkdir -p staticfiles
-mkdir -p media
+# Apply database migrations
+python manage.py migrate
 
 echo "=== Build Complete ==="
