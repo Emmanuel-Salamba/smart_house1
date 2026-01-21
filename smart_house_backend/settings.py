@@ -3,6 +3,8 @@ import dj_database_url
 from pathlib import Path
 from datetime import timedelta
 import sys
+from dotenv import load_dotenv
+load_dotenv()  
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -105,27 +107,55 @@ WSGI_APPLICATION = 'smart_house_backend.wsgi.application'
 ASGI_APPLICATION = 'smart_house_backend.asgi.application'
 
 # ============================================
-# DATABASE CONFIGURATION
+# DATABASE CONFIGURATION - FIXED VERSION
 # ============================================
 
-# Use PostgreSQL if DATABASE_URL is set (Render/Production), otherwise SQLite (Development)
-if os.environ.get('DATABASE_URL'):
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=os.environ.get('DATABASE_URL'),
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
-    }
-    print("⚡ Using PostgreSQL database from DATABASE_URL")
+# Get DATABASE_URL from environment
+database_url = os.environ.get('DATABASE_URL')
+
+# Debug: Show what we found
+print(f"🔍 Checking DATABASE_URL: {'Set' if database_url else 'Not Set'}")
+
+if database_url and 'postgresql://' in database_url:
+    # FORCE PostgreSQL when DATABASE_URL is a PostgreSQL URL
+    try:
+        # Parse the URL and ensure it's PostgreSQL
+        db_config = dj_database_url.parse(database_url, conn_max_age=600)
+        
+        # Force PostgreSQL engine explicitly
+        db_config['ENGINE'] = 'django.db.backends.postgresql'
+        
+        DATABASES = {
+            'default': db_config
+        }
+        
+        print("✅ FORCING PostgreSQL from DATABASE_URL")
+        print(f"🚀 Database Engine: {DATABASES['default']['ENGINE']}")
+        print(f"📊 Database Name: {DATABASES['default'].get('NAME', 'Unknown')}")
+        
+    except Exception as e:
+        print(f"❌ Error parsing DATABASE_URL: {e}")
+        # Fallback to SQLite on error
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+        print("⚠️ Falling back to SQLite due to error")
+        
 else:
+    # Fallback to SQLite for local development
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-    print("💻 Using SQLite database for development")
+    print("💻 Using SQLite (Local Development)")
+
+# Final verification
+print(f"🎯 FINAL Database Engine: {DATABASES['default']['ENGINE']}")
 
 # ============================================
 # PASSWORD VALIDATION
@@ -360,7 +390,7 @@ LOGGING = {
 }
 
 # ============================================
-# ENVIRONMENT DETECTION & LOGGING
+# ENVIRONMENT DETECTION & LOGGING - FIXED
 # ============================================
 
 # Log environment information
@@ -368,16 +398,17 @@ print(f"🎯 Environment: {'PRODUCTION' if not DEBUG else 'DEVELOPMENT'}")
 print(f"🔗 ALLOWED_HOSTS: {ALLOWED_HOSTS}")
 print(f"🌐 WebSockets: {'Enabled' if not IS_VERCEL else 'Disabled (Vercel)'}")
 
-if IS_RENDER:
-    print(f"🚀 Render deployment detected: {RENDER_EXTERNAL_HOSTNAME}")
-    print(f"💾 Database: PostgreSQL")
+# Check actual database engine, not just DATABASE_URL
+actual_engine = DATABASES['default']['ENGINE']
+
+if actual_engine == 'django.db.backends.postgresql':
+    print(f"💾 Database: PostgreSQL (Production)")
+    if IS_RENDER:
+        print(f"🚀 Render deployment detected: {RENDER_EXTERNAL_HOSTNAME}")
+    else:
+        print("📡 Connected to external PostgreSQL database")
     print(f"🧠 Cache: Redis")
-elif IS_VERCEL:
-    print("⚡ Vercel deployment detected")
-    print("⚠️ Note: WebSockets not supported on Vercel")
-    print("💾 Database: PostgreSQL")
-    print("🧠 Cache: Redis (if REDIS_URL set)")
-else:
+elif actual_engine == 'django.db.backends.sqlite3':
     print("💻 Local development environment")
     print("💾 Database: SQLite")
     print("🧠 Cache: Redis (development)")
@@ -402,3 +433,7 @@ if 'test' in sys.argv:
     CACHES['default']['BACKEND'] = 'django.core.cache.backends.dummy.DummyCache'
     # Use in-memory channel layer for tests
     CHANNEL_LAYERS['default']['BACKEND'] = 'channels.layers.InMemoryChannelLayer'
+
+print("=" * 50)
+print("✅ Settings loaded successfully!")
+print("=" * 50)
