@@ -10,11 +10,10 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ============================================
-# PRODUCTION DEPLOYMENT CHECKLIST FOR FLY.IO
+# PRODUCTION DEPLOYMENT SETTINGS
 # ============================================
-# Before deploying to Fly.io, ensure these environment variables are set:
-# Required: SECRET_KEY, DATABASE_URL, REDIS_URL, FLY_APP_NAME
-# Verify: DEBUG is False, ALLOWED_HOSTS includes Fly.io domain
+# This project supports deployment on Render, Fly.io, Railway, and other platforms
+# For Render deployment, Render automatically sets: DATABASE_URL, REDIS_URL, RENDER_EXTERNAL_HOSTNAME
 
 # ============================================
 # SECURITY & ENVIRONMENT SETTINGS
@@ -297,26 +296,16 @@ CACHES = {
 # CHANNELS & WEBSOCKET CONFIGURATION
 # ============================================
 
-# Check if we're on Vercel (which doesn't support WebSockets)
-IS_VERCEL = os.environ.get('VERCEL') == '1'
-
-if IS_VERCEL:
-    # Vercel doesn't support WebSockets, use in-memory layer
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+# Render supports WebSockets with Redis backend
+# Use Redis channel layer for production
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [REDIS_URL],
         },
-    }
-else:
-    # Fly.io, Railway, and Render support WebSockets with Redis
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                "hosts": [REDIS_URL],
-            },
-        },
-    }
+    },
+}
 
 # ============================================
 # SECURITY SETTINGS
@@ -345,6 +334,8 @@ else:
 # ============================================
 # LOGGING CONFIGURATION
 # ============================================
+# For Render: Only console logging is recommended (persists in logs)
+# File logging in /tmp is temporary and will be lost
 
 LOGGING = {
     'version': 1,
@@ -364,39 +355,34 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': 'smart_house.log',
-            'formatter': 'verbose',
-        },
     },
     'root': {
-        'handlers': ['console', 'file'],
+        'handlers': ['console'],
         'level': 'INFO',
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
         'django.channels': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
         'devices': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': False,
         },
         'users': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
         'activities': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },

@@ -1,38 +1,75 @@
 services:
+  # Main Django Web Service
   - type: web
-    name: smart-home-backend
+    name: smart-house-backend
     env: python
-    region: ohio  # or your preferred region
-    buildCommand: "./build.sh"
-    startCommand: "gunicorn smart_house_backend.wsgi:application --bind 0.0.0.0:$PORT"
-    healthCheckPath: /health/
+    runtime: python-3.10
+    region: ohio  # Change to your preferred region (ohio, oregon, frankfurt, etc.)
+    plan: standard  # Free plan available, upgrade as needed
+    
+    # Build configuration
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate"
+    
+    # Start command with gunicorn
+    startCommand: "gunicorn smart_house_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --worker-class sync --timeout 120 --access-logfile -"
+    
+    # Health check configuration
+    healthCheckPath: /admin/  # or create a dedicated /health/ endpoint
+    healthCheckTimeout: 10
+    
+    # Auto-deploy on git push
+    autoDeploy: true
+    
+    # Environment variables
     envVars:
+      # Database configuration
       - key: DATABASE_URL
         fromDatabase:
-          name: smart-home-db
+          name: smart-house-db
           property: connectionString
+      
+      # Redis configuration  
       - key: REDIS_URL
         fromService:
-          name: smart-home-redis
+          name: smart-house-redis
           type: redis
           property: connectionString
+      
+      # Django settings
       - key: SECRET_KEY
         generateValue: true
-      - key: WEB_CONCURRENCY
-        value: 4
+      
       - key: DEBUG
         value: false
+      
+      - key: ENVIRONMENT
+        value: production
+      
+      - key: PYTHONUNBUFFERED
+        value: 1
+      
+      - key: WEB_CONCURRENCY
+        value: 3
+      
+      # Optional: Add your frontend URL for CORS
+      # - key: FRONTEND_URL
+      #   value: "https://your-frontend-domain.com"
 
-    autoDeploy: true
-    plan: free  # Start with free, upgrade later
-
+# PostgreSQL Database
 databases:
-  - name: smart-home-db
-    plan: free
-    databaseName: smart_home
-    user: smart_home_user
+  - name: smart-house-db
+    databaseName: smart_house_db
+    user: smart_house_user
+    # Plan options: free (512MB), starter, standard, etc.
+    plan: starter
+    # Optional: Set ipAllowList for security (currently allows all)
+    # ipAllowList: 
+    #   - "0.0.0.0/0"  # Allow all (default if omitted)
+    postgresPlan: postgres15
 
+# Redis Service for caching and channels
 redis:
-  - name: smart-home-redis
-    plan: free
-    ipAllowList: []  # Allow all (or specify IPs for security)
+  - name: smart-house-redis
+    ipAllowList: []  # Allow all by default
+    plan: starter
+    # Free plan (100MB) or starter (1GB)
