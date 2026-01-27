@@ -51,11 +51,14 @@ services:
         value: 3
 
   # PostgreSQL Database Service
-  - type: pserv
+  - type: postgres
     name: smart-house-db
     plan: free
+    database: smart_house_db
+    user: smart_house_user
 
   # Redis Cache Service
   - type: redis
     name: smart-house-redis
     plan: free
+    ipAllowList: []
