@@ -31,7 +31,6 @@ services:
       - key: REDIS_URL
         fromService:
           name: smart-house-redis
-          type: redis
           property: connectionString
       
       # Django settings
@@ -50,15 +49,15 @@ services:
       - key: WEB_CONCURRENCY
         value: 3
 
-  # PostgreSQL Database Service
-  - type: postgresql
-    name: smart-house-db
-    plan: free
-    database: smart_house_db
-    user: smart_house_user
-
   # Redis Cache Service
   - type: redis
     name: smart-house-redis
     plan: free
     ipAllowList: []
+
+# PostgreSQL Database
+databases:
+  - name: smart-house-db
+    plan: free
+    databaseName: smart_house_db
+    user: smart_house_user
