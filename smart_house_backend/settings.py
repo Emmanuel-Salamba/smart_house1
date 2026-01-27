@@ -10,11 +10,11 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ============================================
-# PRODUCTION DEPLOYMENT CHECKLIST FOR RAILWAY
+# PRODUCTION DEPLOYMENT CHECKLIST FOR FLY.IO
 # ============================================
-# Before deploying to Railway, ensure these environment variables are set:
-# Required: SECRET_KEY, DATABASE_URL, REDIS_URL, RAILWAY_EXTERNAL_HOSTNAME
-# Verify: DEBUG is False, ALLOWED_HOSTS includes Railway domain
+# Before deploying to Fly.io, ensure these environment variables are set:
+# Required: SECRET_KEY, DATABASE_URL, REDIS_URL, FLY_APP_NAME
+# Verify: DEBUG is False, ALLOWED_HOSTS includes Fly.io domain
 
 # ============================================
 # SECURITY & ENVIRONMENT SETTINGS
@@ -44,14 +44,14 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '0.0.0.0',
-    '*.up.railway.app',  # Railway.app domains
+    '*.fly.dev',         # Fly.io domains
     '*.onrender.com',    # Render domains
 ]
 
-# Add Railway external hostname if available
-RAILWAY_EXTERNAL_HOSTNAME = os.environ.get('RAILWAY_EXTERNAL_HOSTNAME')
-if RAILWAY_EXTERNAL_HOSTNAME:
-    ALLOWED_HOSTS.append(RAILWAY_EXTERNAL_HOSTNAME)
+# Add Fly.io hostname if available
+FLY_APP_NAME = os.environ.get('FLY_APP_NAME')
+if FLY_APP_NAME:
+    ALLOWED_HOSTS.append(f'{FLY_APP_NAME}.fly.dev')
 
 # Add Render external hostname if available
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
@@ -260,9 +260,9 @@ else:
     ]
     CORS_ALLOWED_ORIGINS.extend(production_domains)
     
-    # Add Railway domain if configured
-    if RAILWAY_EXTERNAL_HOSTNAME:
-        CORS_ALLOWED_ORIGINS.append(f"https://{RAILWAY_EXTERNAL_HOSTNAME}")
+    # Add Fly.io domain if configured
+    if FLY_APP_NAME:
+        CORS_ALLOWED_ORIGINS.append(f"https://{FLY_APP_NAME}.fly.dev")
     
     # Add Render domain if configured
     if RENDER_EXTERNAL_HOSTNAME:
@@ -308,7 +308,7 @@ if IS_VERCEL:
         },
     }
 else:
-    # Railway and Render support WebSockets with Redis
+    # Fly.io, Railway, and Render support WebSockets with Redis
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',

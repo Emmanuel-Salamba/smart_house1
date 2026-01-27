@@ -1,0 +1,70 @@
+# Fly.io Configuration for Smart House Backend
+# Generated for Django deployment
+
+app = "smart-house-backend"  # Change this to your desired app name
+primary_region = "iad"        # Change to your preferred region (iad, lax, sjc, etc.)
+
+[build]
+builder = "paketobuildpacks"  # Use Paketo buildpacks for Python
+buildpacks = ["gcr.io/paketo-buildpacks/python"]
+
+[env]
+PORT = "8000"
+
+[http_service]
+internal_port = 8000
+force_https = true
+auto_stop_machines = true
+auto_start_machines = true
+min_machines_running = 1
+
+# Environment variables
+[env]
+PORT = "8000"
+PYTHONUNBUFFERED = "1"
+
+# Secrets (set via: flyctl secrets set SECRET_KEY=... DEBUG=False)
+# Required secrets:
+# - SECRET_KEY: Django secret key
+# - DEBUG: Set to False
+# - DATABASE_URL: PostgreSQL connection string
+# - REDIS_URL: Redis connection string
+
+[[services]]
+protocol = "tcp"
+internal_port = 8000
+processes = ["app"]
+
+  [services.concurrency]
+  type = "connections"
+  hard_limit = 100
+  soft_limit = 80
+
+  [[services.ports]]
+  port = 80
+  handlers = ["http"]
+
+  [[services.ports]]
+  port = 443
+  handlers = ["tls", "http"]
+
+[checks]
+  [checks.http_status]
+  grace_period = "30s"
+  interval = "10s"
+  method = "GET"
+  path = "/health/"
+  protocol = "http"
+  timeout = "5s"
+
+# Volumes (uncomment if you need persistent storage)
+# [[mounts]]
+# source = "smart_house_data"
+# destination = "/data"
+
+# Scale settings
+[processes]
+app = "gunicorn smart_house_backend.wsgi:application --bind 0.0.0.0:${PORT} --workers 2 --worker-class sync --timeout 120"
+
+# PostgreSQL and Redis will be created as separate services
+# You can link them using flyctl apps list and flyctl apps create
