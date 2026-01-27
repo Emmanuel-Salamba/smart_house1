@@ -51,7 +51,7 @@ services:
         value: 3
 
   # PostgreSQL Database Service
-  - type: postgres
+  - type: postgresql
     name: smart-house-db
     plan: free
     database: smart_house_db
