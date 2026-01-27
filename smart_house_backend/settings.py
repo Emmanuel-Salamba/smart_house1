@@ -10,14 +10,30 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ============================================
+# PRODUCTION DEPLOYMENT CHECKLIST FOR RAILWAY
+# ============================================
+# Before deploying to Railway, ensure these environment variables are set:
+# Required: SECRET_KEY, DATABASE_URL, REDIS_URL, RAILWAY_EXTERNAL_HOSTNAME
+# Verify: DEBUG is False, ALLOWED_HOSTS includes Railway domain
+
+# ============================================
 # SECURITY & ENVIRONMENT SETTINGS
 # ============================================
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-g&i8!boiz_q9_#!57n4rt!b@zhmub=r1d*ma+p^+plw22ev5@l')
+# MUST be set via environment variable in production
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    if not os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes'):
+        raise ValueError(
+            "ERROR: SECRET_KEY environment variable is required in production. "
+            "Set it before deploying to Railway or other production environments."
+        )
+    # For development only
+    SECRET_KEY = 'django-insecure-dev-key-change-in-production'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 AUTH_USER_MODEL = 'users.User'
 
 # ============================================
@@ -28,7 +44,14 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '0.0.0.0',
+    '*.up.railway.app',  # Railway.app domains
+    '*.onrender.com',    # Render domains
 ]
+
+# Add Railway external hostname if available
+RAILWAY_EXTERNAL_HOSTNAME = os.environ.get('RAILWAY_EXTERNAL_HOSTNAME')
+if RAILWAY_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RAILWAY_EXTERNAL_HOSTNAME)
 
 # Add Render external hostname if available
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
@@ -113,9 +136,6 @@ ASGI_APPLICATION = 'smart_house_backend.asgi.application'
 # Get DATABASE_URL from environment
 database_url = os.environ.get('DATABASE_URL')
 
-# Debug: Show what we found
-print(f"🔍 Checking DATABASE_URL: {'Set' if database_url else 'Not Set'}")
-
 if database_url and 'postgresql://' in database_url:
     # FORCE PostgreSQL when DATABASE_URL is a PostgreSQL URL
     try:
@@ -129,12 +149,7 @@ if database_url and 'postgresql://' in database_url:
             'default': db_config
         }
         
-        print("✅ FORCING PostgreSQL from DATABASE_URL")
-        print(f"🚀 Database Engine: {DATABASES['default']['ENGINE']}")
-        print(f"📊 Database Name: {DATABASES['default'].get('NAME', 'Unknown')}")
-        
     except Exception as e:
-        print(f"❌ Error parsing DATABASE_URL: {e}")
         # Fallback to SQLite on error
         DATABASES = {
             'default': {
@@ -142,7 +157,6 @@ if database_url and 'postgresql://' in database_url:
                 'NAME': BASE_DIR / 'db.sqlite3',
             }
         }
-        print("⚠️ Falling back to SQLite due to error")
         
 else:
     # Fallback to SQLite for local development
@@ -152,10 +166,6 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-    print("💻 Using SQLite (Local Development)")
-
-# Final verification
-print(f"🎯 FINAL Database Engine: {DATABASES['default']['ENGINE']}")
 
 # ============================================
 # PASSWORD VALIDATION
@@ -244,12 +254,19 @@ CORS_ALLOWED_ORIGINS = [
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
-    # Production CORS settings
-    CORS_ALLOWED_ORIGINS.extend([
-        "https://your-flutter-app-domain.com",  # Your Flutter app domain
-        "https://*.onrender.com",              # Render domains
-        "https://*.vercel.app",                # Vercel domains (for compatibility)
-    ])
+    # Production CORS settings - Add your actual frontend domains here
+    production_domains = [
+        "https://your-flutter-app-domain.com",  # Replace with your Flutter app domain
+    ]
+    CORS_ALLOWED_ORIGINS.extend(production_domains)
+    
+    # Add Railway domain if configured
+    if RAILWAY_EXTERNAL_HOSTNAME:
+        CORS_ALLOWED_ORIGINS.append(f"https://{RAILWAY_EXTERNAL_HOSTNAME}")
+    
+    # Add Render domain if configured
+    if RENDER_EXTERNAL_HOSTNAME:
+        CORS_ALLOWED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
 
 # CORS settings for Forest Admin
 CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -282,10 +299,8 @@ CACHES = {
 
 # Check if we're on Vercel (which doesn't support WebSockets)
 IS_VERCEL = os.environ.get('VERCEL') == '1'
-IS_RENDER = RENDER_EXTERNAL_HOSTNAME is not None
 
 if IS_VERCEL:
-    print("⚠️ Vercel detected - WebSockets disabled")
     # Vercel doesn't support WebSockets, use in-memory layer
     CHANNEL_LAYERS = {
         'default': {
@@ -293,8 +308,7 @@ if IS_VERCEL:
         },
     }
 else:
-    print("✅ WebSockets enabled for Render/Local")
-    # Render supports WebSockets with Redis
+    # Railway and Render support WebSockets with Redis
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
@@ -390,39 +404,9 @@ LOGGING = {
 }
 
 # ============================================
-# ENVIRONMENT DETECTION & LOGGING - FIXED
+# TEST ENVIRONMENT CONFIGURATION
 # ============================================
 
-# Log environment information
-print(f"🎯 Environment: {'PRODUCTION' if not DEBUG else 'DEVELOPMENT'}")
-print(f"🔗 ALLOWED_HOSTS: {ALLOWED_HOSTS}")
-print(f"🌐 WebSockets: {'Enabled' if not IS_VERCEL else 'Disabled (Vercel)'}")
-
-# Check actual database engine, not just DATABASE_URL
-actual_engine = DATABASES['default']['ENGINE']
-
-if actual_engine == 'django.db.backends.postgresql':
-    print(f"💾 Database: PostgreSQL (Production)")
-    if IS_RENDER:
-        print(f"🚀 Render deployment detected: {RENDER_EXTERNAL_HOSTNAME}")
-    else:
-        print("📡 Connected to external PostgreSQL database")
-    print(f"🧠 Cache: Redis")
-elif actual_engine == 'django.db.backends.sqlite3':
-    print("💻 Local development environment")
-    print("💾 Database: SQLite")
-    print("🧠 Cache: Redis (development)")
-
-# ============================================
-# COMPATIBILITY FIXES
-# ============================================
-
-# Ensure WebSockets are properly disabled on Vercel
-if IS_VERCEL and 'channels' in INSTALLED_APPS:
-    # Keep channels in INSTALLED_APPS but use InMemoryChannelLayer
-    pass
-
-# Fix for test environment
 if 'test' in sys.argv:
     # Use SQLite for tests
     DATABASES['default'] = {
@@ -433,7 +417,3 @@ if 'test' in sys.argv:
     CACHES['default']['BACKEND'] = 'django.core.cache.backends.dummy.DummyCache'
     # Use in-memory channel layer for tests
     CHANNEL_LAYERS['default']['BACKEND'] = 'channels.layers.InMemoryChannelLayer'
-
-print("=" * 50)
-print("✅ Settings loaded successfully!")
-print("=" * 50)
