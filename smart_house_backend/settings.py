@@ -157,28 +157,28 @@ if database_url and 'postgresql://' in database_url:
                 'NAME': BASE_DIR / 'db.sqlite3',
             }
         }
-<<<<<<< HEAD
-=======
-        print("⚠️ Falling back to SQLite due to error")
->>>>>>> 29f249b9488a27dc9c43862dd9d13e6636c1122e
         
 else:
     # Fallback to SQLite for local development
     DATABASES = {
         'default': {
-<<<<<<< HEAD
-=======
-    print("💻 Using SQLite (Local Development)")
-
-# Final verification
-print(f"🎯 FINAL Database Engine: {DATABASES['default']['ENGINE']}")
->>>>>>> 29f249b9488a27dc9c43862dd9d13e6636c1122e
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # ============================================
 # PASSWORD VALIDATION
 # ============================================
 
-AUTH_
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
     },
     {
@@ -404,25 +404,16 @@ LOGGING = {
 }
 
 # ============================================
-<<<<<<< HEAD
 # TEST ENVIRONMENT CONFIGURATION
 # ============================================
 
-=======
-# ENVIRONMENT DETECTION & LOGGING - FIXED
-# ============================================
-
-# Log environment information
-print(f"🎯 Environment: {'PRODUCTION' if not DEBUG else 'DEVELOPMENT'}")
-print(f"🔗 ALLOWED_HOSTS: {ALLOWED_HOSTS}")
-print(f"🌐 WebSockets: {'Enabled' if not IS_VERCEL else 'Disabled (Vercel)'}")
-
-# Check actual database engine, not just DATABASE_URL
-actual_engine = DATABASES['default']['ENGINE']
-
-if actual_engine == 'django.db.backends.postgresql':
-    print(f"💾 Database: PostgreSQL (Production)")
-    if IS_RENDER:
-        print(f"🚀 Render deployment detected: {RENDER_EXTERNAL_HOSTNAME}")
-# TEST ENVIRONMENT CONFIGURATION
-# ============================================
+if 'test' in sys.argv:
+    # Use SQLite for tests
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'test_db.sqlite3',
+    }
+    # Disable caching for tests
+    CACHES['default']['BACKEND'] = 'django.core.cache.backends.dummy.DummyCache'
+    # Use in-memory channel layer for tests
+    CHANNEL_LAYERS['default']['BACKEND'] = 'channels.layers.InMemoryChannelLayer'
