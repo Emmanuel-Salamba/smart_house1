@@ -4,8 +4,8 @@ services:
     name: smart-house-backend
     env: python
     runtime: python-3.10
-    region: ohio  # Change to your preferred region (ohio, oregon, frankfurt, etc.)
-    plan: standard  # Free plan available, upgrade as needed
+    region: ohio
+    plan: free
     
     # Build configuration
     buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate"
@@ -14,8 +14,7 @@ services:
     startCommand: "gunicorn smart_house_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --worker-class sync --timeout 120 --access-logfile -"
     
     # Health check configuration
-    healthCheckPath: /admin/  # or create a dedicated /health/ endpoint
-    healthCheckTimeout: 10
+    healthCheckPath: /admin/
     
     # Auto-deploy on git push
     autoDeploy: true
@@ -50,26 +49,16 @@ services:
       
       - key: WEB_CONCURRENCY
         value: 3
-      
-      # Optional: Add your frontend URL for CORS
-      # - key: FRONTEND_URL
-      #   value: "https://your-frontend-domain.com"
 
-# PostgreSQL Database
-databases:
-  - name: smart-house-db
-    databaseName: smart_house_db
-    user: smart_house_user
-    # Plan options: free (512MB), starter, standard, etc.
-    plan: starter
-    # Optional: Set ipAllowList for security (currently allows all)
-    # ipAllowList: 
-    #   - "0.0.0.0/0"  # Allow all (default if omitted)
-    postgresPlan: postgres15
+  # PostgreSQL Database Service
+  - type: pserv
+    name: smart-house-db
+    env: postgresql
+    plan: free
+    ipAllowList: []
 
-# Redis Service for caching and channels
-redis:
-  - name: smart-house-redis
-    ipAllowList: []  # Allow all by default
-    plan: starter
-    # Free plan (100MB) or starter (1GB)
+  # Redis Cache Service
+  - type: redis
+    name: smart-house-redis
+    plan: free
+    ipAllowList: []
