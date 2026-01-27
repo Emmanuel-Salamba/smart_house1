@@ -4,29 +4,27 @@ from pathlib import Path
 from datetime import timedelta
 import sys
 from dotenv import load_dotenv
-load_dotenv()  
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ============================================
-# PRODUCTION DEPLOYMENT SETTINGS
+# PRODUCTION DEPLOYMENT SETTINGS - RENDER READY
 # ============================================
-# This project supports deployment on Render, Fly.io, Railway, and other platforms
-# For Render deployment, Render automatically sets: DATABASE_URL, REDIS_URL, RENDER_EXTERNAL_HOSTNAME
 
 # ============================================
 # SECURITY & ENVIRONMENT SETTINGS
 # ============================================
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# MUST be set via environment variable in production
 SECRET_KEY = os.environ.get('SECRET_KEY')
 if not SECRET_KEY:
     if not os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes'):
         raise ValueError(
             "ERROR: SECRET_KEY environment variable is required in production. "
-            "Set it before deploying to Railway or other production environments."
+            "Set it in Render dashboard: Settings -> Environment Variables"
         )
     # For development only
     SECRET_KEY = 'django-insecure-dev-key-change-in-production'
@@ -34,6 +32,9 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 AUTH_USER_MODEL = 'users.User'
+
+# Check if running on Render
+IS_RENDER = os.environ.get('RENDER', 'false').lower() == 'true'
 
 # ============================================
 # HOST CONFIGURATION
@@ -43,27 +44,37 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '0.0.0.0',
-    '*.fly.dev',         # Fly.io domains
-    '*.onrender.com',    # Render domains
 ]
 
-# Add Fly.io hostname if available
+# Render configuration
+if IS_RENDER:
+    ALLOWED_HOSTS.extend(['*.onrender.com'])
+    # Static files will be served from the root
+    STATIC_URL = '/static/'
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+    
+# Add Fly.io if configured
 FLY_APP_NAME = os.environ.get('FLY_APP_NAME')
 if FLY_APP_NAME:
     ALLOWED_HOSTS.append(f'{FLY_APP_NAME}.fly.dev')
 
-# Add Render external hostname if available
+# Add Render external hostname if available (for custom domains)
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    if IS_RENDER:
+        CSRF_TRUSTED_ORIGINS = [f'https://{RENDER_EXTERNAL_HOSTNAME}']
 
 # Add Vercel domains (for compatibility)
 if os.environ.get('VERCEL') == '1':
     ALLOWED_HOSTS.extend(['.vercel.app', '.now.sh'])
 
 # Add custom domain if specified
-if os.environ.get('CUSTOM_DOMAIN'):
-    ALLOWED_HOSTS.append(os.environ.get('CUSTOM_DOMAIN'))
+CUSTOM_DOMAIN = os.environ.get('CUSTOM_DOMAIN')
+if CUSTOM_DOMAIN:
+    ALLOWED_HOSTS.append(CUSTOM_DOMAIN)
+    CSRF_TRUSTED_ORIGINS = CSRF_TRUSTED_ORIGINS if 'CSRF_TRUSTED_ORIGINS' in locals() else []
+    CSRF_TRUSTED_ORIGINS.append(f'https://{CUSTOM_DOMAIN}')
 
 # ============================================
 # APPLICATION DEFINITION
@@ -81,7 +92,6 @@ INSTALLED_APPS = [
     'channels',
     'rest_framework',
     'corsheaders',
-    # 'forestadmin.django_agent',
 
     # Local apps
     'users',
@@ -129,36 +139,49 @@ WSGI_APPLICATION = 'smart_house_backend.wsgi.application'
 ASGI_APPLICATION = 'smart_house_backend.asgi.application'
 
 # ============================================
-# DATABASE CONFIGURATION - FIXED VERSION
+# DATABASE CONFIGURATION - RENDER OPTIMIZED
 # ============================================
 
-# Get DATABASE_URL from environment
+# Get DATABASE_URL from environment (Render automatically provides this)
 database_url = os.environ.get('DATABASE_URL')
 
-if database_url and 'postgresql://' in database_url:
-    # FORCE PostgreSQL when DATABASE_URL is a PostgreSQL URL
+if database_url:
+    # Render provides 'postgres://', Django needs 'postgresql://'
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    
     try:
-        # Parse the URL and ensure it's PostgreSQL
-        db_config = dj_database_url.parse(database_url, conn_max_age=600)
-        
-        # Force PostgreSQL engine explicitly
-        db_config['ENGINE'] = 'django.db.backends.postgresql'
-        
+        # Parse the database URL
         DATABASES = {
-            'default': db_config
+            'default': dj_database_url.parse(
+                database_url,
+                conn_max_age=600,
+                conn_health_checks=True,
+            )
         }
         
+        # Add production optimizations
+        if not DEBUG:
+            DATABASES['default']['CONN_MAX_AGE'] = 600
+            DATABASES['default']['OPTIONS'] = {
+                'connect_timeout': 10,
+                'keepalives': 1,
+                'keepalives_idle': 30,
+                'keepalives_interval': 10,
+                'keepalives_count': 5,
+            }
+            
     except Exception as e:
-        # Fallback to SQLite on error
+        print(f"Database configuration error: {e}")
+        print("Falling back to SQLite for development")
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.sqlite3',
                 'NAME': BASE_DIR / 'db.sqlite3',
             }
         }
-        
 else:
-    # Fallback to SQLite for local development
+    # Development database
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -195,14 +218,20 @@ USE_I18N = True
 USE_TZ = True
 
 # ============================================
-# STATIC & MEDIA FILES
+# STATIC & MEDIA FILES - RENDER OPTIMIZED
 # ============================================
 
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / "static"]
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+# Static files configuration (works for both Render and local)
+STATIC_URL = '/static/'  # Always use leading slash for URL routing
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Include custom static files directory if it exists
+STATICFILES_DIRS = [BASE_DIR / "static"] if os.path.isdir(BASE_DIR / "static") else []
+
+# Whitenoise configuration
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -219,7 +248,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',  # For admin interface
+        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -238,7 +267,7 @@ SIMPLE_JWT = {
 }
 
 # ============================================
-# CORS SETTINGS
+# CORS SETTINGS - PRODUCTION READY
 # ============================================
 
 # Base CORS settings
@@ -249,28 +278,32 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
 ]
 
+# Add production domains
+if RENDER_EXTERNAL_HOSTNAME:
+    CORS_ALLOWED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
+
+if FLY_APP_NAME:
+    CORS_ALLOWED_ORIGINS.append(f"https://{FLY_APP_NAME}.fly.dev")
+
+if CUSTOM_DOMAIN:
+    CORS_ALLOWED_ORIGINS.append(f"https://{CUSTOM_DOMAIN}")
+
 # For development, allow all origins (adjust for production)
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOWED_ORIGINS = []  # Clear the list when allowing all
 else:
-    # Production CORS settings - Add your actual frontend domains here
-    production_domains = [
-        "https://your-flutter-app-domain.com",  # Replace with your Flutter app domain
-    ]
-    CORS_ALLOWED_ORIGINS.extend(production_domains)
-    
-    # Add Fly.io domain if configured
-    if FLY_APP_NAME:
-        CORS_ALLOWED_ORIGINS.append(f"https://{FLY_APP_NAME}.fly.dev")
-    
-    # Add Render domain if configured
-    if RENDER_EXTERNAL_HOSTNAME:
-        CORS_ALLOWED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
+    # Strict CORS for production
+    CORS_ALLOW_ALL_ORIGINS = False
 
-# CORS settings for Forest Admin
+# Allow specific regex patterns
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r".*\.forestadmin\.com.*",
 ]
+
+# Add Render subdomains
+if IS_RENDER:
+    CORS_ALLOWED_ORIGIN_REGEXES.append(r"https://.*\.onrender\.com")
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -278,7 +311,12 @@ CORS_ALLOW_CREDENTIALS = True
 # REDIS & CACHE CONFIGURATION
 # ============================================
 
+# Get Redis URL (Render Redis addon provides REDIS_URL)
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
+
+# Fix Redis URL format if needed
+if REDIS_URL and not REDIS_URL.startswith('redis://'):
+    REDIS_URL = f'redis://{REDIS_URL}:6379'
 
 # Cache configuration
 CACHES = {
@@ -288,6 +326,8 @@ CACHES = {
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
             'IGNORE_EXCEPTIONS': True,
+            'SOCKET_CONNECT_TIMEOUT': 5,
+            'SOCKET_TIMEOUT': 5,
         }
     }
 }
@@ -296,23 +336,32 @@ CACHES = {
 # CHANNELS & WEBSOCKET CONFIGURATION
 # ============================================
 
-# Render supports WebSockets with Redis backend
-# Use Redis channel layer for production
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [REDIS_URL],
+# Use Redis if available, otherwise in-memory for development
+if REDIS_URL and REDIS_URL != 'redis://localhost:6379':
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [REDIS_URL],
+                "capacity": 1500,
+                "expiry": 10,
+            },
         },
-    },
-}
+    }
+else:
+    # Development/fallback channel layer
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer'
+        }
+    }
 
 # ============================================
 # SECURITY SETTINGS
 # ============================================
 
 # WebSocket and command timeout settings
-COMMAND_TIMEOUT = 30  # seconds to wait for microcontroller ACK
+COMMAND_TIMEOUT = 30
 
 # Security settings for production
 if not DEBUG:
@@ -321,21 +370,34 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
-    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     X_FRAME_OPTIONS = 'DENY'
+    
+    # Ensure CSRF trusted origins are set
+    if 'CSRF_TRUSTED_ORIGINS' not in locals():
+        CSRF_TRUSTED_ORIGINS = []
+    
+    # Add all HTTPS origins from CORS_ALLOWED_ORIGINS
+    for origin in CORS_ALLOWED_ORIGINS:
+        if origin.startswith('https://'):
+            CSRF_TRUSTED_ORIGINS.append(origin)
+    
+    # Add regex origins that are HTTPS
+    for regex in CORS_ALLOWED_ORIGIN_REGEXES:
+        if 'https://' in regex:
+            CSRF_TRUSTED_ORIGINS.append(regex)
 else:
     # Development security settings
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
+    CSRF_TRUSTED_ORIGINS = []  # Clear for development
 
 # ============================================
-# LOGGING CONFIGURATION
+# LOGGING CONFIGURATION - RENDER OPTIMIZED
 # ============================================
-# For Render: Only console logging is recommended (persists in logs)
-# File logging in /tmp is temporary and will be lost
 
 LOGGING = {
     'version': 1,
@@ -354,6 +416,7 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+            'stream': sys.stdout,  # Render captures stdout
         },
     },
     'root': {
@@ -363,7 +426,12 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['console'],
-            'level': 'INFO',
+            'level': 'INFO' if DEBUG else 'WARNING',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'ERROR',  # Reduce SQL log noise in production
             'propagate': False,
         },
         'django.channels': {
@@ -373,7 +441,7 @@ LOGGING = {
         },
         'devices': {
             'handlers': ['console'],
-            'level': 'DEBUG',
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
         'users': {
@@ -393,7 +461,7 @@ LOGGING = {
 # TEST ENVIRONMENT CONFIGURATION
 # ============================================
 
-if 'test' in sys.argv:
+if 'test' in sys.argv or 'pytest' in sys.argv[0]:
     # Use SQLite for tests
     DATABASES['default'] = {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -403,3 +471,22 @@ if 'test' in sys.argv:
     CACHES['default']['BACKEND'] = 'django.core.cache.backends.dummy.DummyCache'
     # Use in-memory channel layer for tests
     CHANNEL_LAYERS['default']['BACKEND'] = 'channels.layers.InMemoryChannelLayer'
+    # Disable security for tests
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+
+# ============================================
+# HEALTH CHECK SETTINGS FOR RENDER
+# ============================================
+
+# Render health check endpoint (if you add it to urls.py)
+HEALTH_CHECK_ENABLED = IS_RENDER
+
+print(f"=== Django Settings ===")
+print(f"Debug mode: {DEBUG}")
+print(f"Running on Render: {IS_RENDER}")
+print(f"Allowed hosts: {ALLOWED_HOSTS}")
+print(f"Database engine: {DATABASES['default'].get('ENGINE', 'unknown')}")
+print(f"Static root: {STATIC_ROOT}")
+print(f"========================")
