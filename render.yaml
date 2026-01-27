@@ -3,7 +3,7 @@ services:
   - type: web
     name: smart-house-backend
     env: python
-    runtime: python-3.10
+    runtime: python
     region: ohio
     plan: free
     
@@ -53,12 +53,9 @@ services:
   # PostgreSQL Database Service
   - type: pserv
     name: smart-house-db
-    env: postgresql
     plan: free
-    ipAllowList: []
 
   # Redis Cache Service
   - type: redis
     name: smart-house-redis
     plan: free
-    ipAllowList: []
