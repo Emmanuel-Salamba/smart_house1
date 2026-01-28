@@ -8,7 +8,7 @@ services:
     plan: free
     
     # Build configuration
-    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --no-input"
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py create_superuser"
     
     # Start command with gunicorn
     startCommand: "python manage.py migrate --noinput && gunicorn smart_house_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --worker-class sync --timeout 120 --access-logfile -"
