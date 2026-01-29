@@ -232,3 +232,94 @@ def logout_user(request):
     )
 
     return Response({'message': 'Logged out successfully'})
+
+
+
+
+# ============================================
+# SUPERUSER CREATION ENDPOINT (DEPLOYMENT)
+# ============================================
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def create_superuser_endpoint(request):
+    """
+    Create a superuser via API endpoint.
+    
+    Secured by DEPLOYMENT_TOKEN environment variable.
+    
+    Request body:
+    {
+        "token": "your-deployment-token",
+        "email": "admin@example.com",
+        "password": "securepAssWORD123!",
+        "first_name": "Admin",
+        "last_name": "User"
+    }
+    """
+    import os
+    
+    # Get deployment token from environment
+    deployment_token = os.environ.get('DEPLOYMENT_TOKEN', '')
+    
+    if not deployment_token:
+        return Response(
+            {'error': 'Deployment token not configured'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+    # Verify token
+    provided_token = request.data.get('token', '')
+    if not provided_token or provided_token != deployment_token:
+        return Response(
+            {'error': 'Invalid or missing deployment token'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    # Extract and validate data
+    email = request.data.get('email', '').strip()
+    password = request.data.get('password', '').strip()
+    first_name = request.data.get('first_name', 'Admin').strip()
+    last_name = request.data.get('last_name', 'User').strip()
+    
+    if not email or not password:
+        return Response(
+            {'error': 'Email and password are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    if len(password) < 8:
+        return Response(
+            {'error': 'Password must be at least 8 characters'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Check if superuser exists
+        if User.objects.filter(email=email).exists():
+            return Response(
+                {'message': f'Superuser "{email}" already exists'},
+                status=status.HTTP_200_OK
+            )
+        
+        # Create superuser
+        User.objects.create_superuser(
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name
+        )
+        
+        return Response(
+            {
+                'message': '✅ Superuser created successfully',
+                'email': email
+            },
+            status=status.HTTP_201_CREATED
+        )
+    
+    except Exception as e:
+        return Response(
+            {'error': f'Error: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

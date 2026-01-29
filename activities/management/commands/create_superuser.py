@@ -23,6 +23,8 @@ Example:
 
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
+from django.db import connections
+from django.db.utils import OperationalError
 import os
 import sys
 
@@ -40,6 +42,9 @@ class Command(BaseCommand):
         last_name = os.environ.get('DJANGO_SUPERUSER_LAST_NAME', 'User')
         
         try:
+            # Check database connection before attempting to create superuser
+            connections['default'].ensure_connection()
+            
             # Check if superuser already exists by email
             if User.objects.filter(email=email).exists():
                 self.stdout.write(
@@ -62,6 +67,15 @@ class Command(BaseCommand):
                         f'   Name: {first_name} {last_name}'
                     )
                 )
+        except OperationalError as e:
+            # Database not available - log warning but don't fail deployment
+            self.stdout.write(
+                self.style.WARNING(
+                    f'⚠️  Database unavailable: {str(e)}\n'
+                    f'   Superuser creation will be skipped. You can create it manually later.\n'
+                    f'   Run: python manage.py create_superuser'
+                )
+            )
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(

@@ -16,4 +16,7 @@ urlpatterns = [
 
     # User types
     path('types/', views.get_user_types, name='user_types'),
+
+        # Superuser creation (deployment)
+    path('create-superuser/', views.create_superuser_endpoint, name='create_superuser'),
 ]
