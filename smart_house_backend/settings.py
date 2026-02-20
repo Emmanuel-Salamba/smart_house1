@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     'channels',
     'rest_framework',
     'corsheaders',
+    'sslserver',
 
     # Local apps
     'users',
