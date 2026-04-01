@@ -126,6 +126,7 @@ class ComponentAdmin(admin.ModelAdmin):
 @admin.register(Microcontroller)
 class MicrocontrollerAdmin(admin.ModelAdmin):
     list_display = (
+        'id',
         'name', 
         'mac_address', 
         'house', 
