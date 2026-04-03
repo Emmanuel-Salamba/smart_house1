@@ -491,3 +491,47 @@ print(f"Allowed hosts: {ALLOWED_HOSTS}")
 print(f"Database engine: {DATABASES['default'].get('ENGINE', 'unknown')}")
 print(f"Static root: {STATIC_ROOT}")
 print(f"========================")
+
+
+# ==================== CORS SETTINGS FOR ESP32 WEBSOCKET ====================
+# Allow all origins for WebSocket connections (for ESP32)
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+
+# Allow specific HTTP methods
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Allow specific headers for WebSocket upgrade
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'upgrade',
+    'connection',
+    'sec-websocket-key',
+    'sec-websocket-version',
+    'sec-websocket-extensions',
+]
+
+# For WebSocket connections
+ASGI_APPLICATION = 'smart_house_backend.asgi.application'
+
+# Channel layers for WebSocket (use in-memory for testing)
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
