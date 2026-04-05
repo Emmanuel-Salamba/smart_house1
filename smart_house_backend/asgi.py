@@ -11,19 +11,31 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 from channels.security.websocket import AllowedHostsOriginValidator
 
-# Import your app routing
+# ============================================
+# CRITICAL: Set settings module FIRST
+# ============================================
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'smart_house_backend.settings')
+
+# ============================================
+# CRITICAL: Setup Django BEFORE importing any app modules
+# This ensures the app registry is ready
+# ============================================
+django.setup()
+
+# ============================================
+# Now import your routing modules AFTER django.setup()
+# ============================================
 import devices.routing
 import activities.routing
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'smart_house_backend.settings')
-
-# Initialize Django
-django.setup()
-
-# Initialize Django ASGI application early
+# ============================================
+# Get Django ASGI application for HTTP requests
+# ============================================
 django_asgi_app = get_asgi_application()
 
-# Application with WebSocket support for Render
+# ============================================
+# Main ASGI application with WebSocket support
+# ============================================
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
     "websocket": AllowedHostsOriginValidator(
@@ -36,5 +48,7 @@ application = ProtocolTypeRouter({
     ),
 })
 
+# ============================================
 # For compatibility with various deployment platforms
+# ============================================
 app = application
