@@ -23,7 +23,9 @@ class MobileAppConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
             await self.accept()
+            print(f"✅ Mobile app connected to house {self.house_id}")
         else:
+            print(f"❌ Mobile app access denied to house {self.house_id}")
             await self.close()
 
     async def disconnect(self, close_code):
@@ -31,6 +33,7 @@ class MobileAppConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
+        print(f"🔴 Mobile app disconnected from house {self.house_id}")
 
     async def receive(self, text_data):
         try:
@@ -232,32 +235,45 @@ class MicrocontrollerConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _authenticate_microcontroller(self):
         from devices.models import Microcontroller
-        import logging
-        logger = logging.getLogger(__name__)
+        
+        print(f"\n🔐 AUTHENTICATION DEBUG:")
+        print(f"   Received ID: {self.microcontroller_id}")
+        print(f"   Received API Key: {self.api_key}")
         
         try:
-            # First check if microcontroller exists at all
-            mc_exists = Microcontroller.objects.filter(id=self.microcontroller_id).exists()
-            print(f"   Microcontroller exists in DB: {mc_exists}")
+            # Try to find the microcontroller by ID first
+            microcontroller = Microcontroller.objects.filter(
+                id=self.microcontroller_id
+            ).first()
             
-            if mc_exists:
-                mc = Microcontroller.objects.get(id=self.microcontroller_id)
-                print(f"   Stored API Key: {mc.api_key}")
-                print(f"   API Keys match: {mc.api_key == self.api_key}")
-                print(f"   is_approved: {mc.is_approved}")
+            if not microcontroller:
+                print(f"   ❌ Microcontroller with ID {self.microcontroller_id} NOT FOUND in database!")
+                # List all microcontrollers for debugging
+                all_mc = Microcontroller.objects.all()
+                print(f"   Total microcontrollers in DB: {all_mc.count()}")
+                for mc in all_mc:
+                    print(f"      - ID: {mc.id}, Name: {mc.name}")
+                return False
             
-            # Now try to authenticate
-            microcontroller = Microcontroller.objects.get(
-                id=self.microcontroller_id,
-                api_key=self.api_key,
-                is_approved=True
-            )
-            self.microcontroller = microcontroller
-            return True
+            print(f"   ✅ Found microcontroller: {microcontroller.name}")
+            print(f"   Stored API Key: {microcontroller.api_key}")
+            print(f"   API Keys match: {microcontroller.api_key == self.api_key}")
+            print(f"   is_approved: {microcontroller.is_approved}")
             
-        except Microcontroller.DoesNotExist:
-            print(f"   ❌ No matching microcontroller found with is_approved=True")
-            return False
+            # Check if approved and API key matches
+            if microcontroller.api_key == self.api_key and microcontroller.is_approved:
+                self.microcontroller = microcontroller
+                print(f"   ✅ AUTH SUCCESS for {self.microcontroller_id}!")
+                return True
+            else:
+                if microcontroller.api_key != self.api_key:
+                    print(f"   ❌ API KEY MISMATCH!")
+                    print(f"      Expected: {microcontroller.api_key}")
+                    print(f"      Got: {self.api_key}")
+                if not microcontroller.is_approved:
+                    print(f"   ❌ MICROCONTROLLER NOT APPROVED! is_approved = False")
+                return False
+                
         except Exception as e:
             print(f"   ❌ Authentication error: {e}")
             return False
