@@ -12,38 +12,49 @@ from channels.auth import AuthMiddlewareStack
 from channels.security.websocket import AllowedHostsOriginValidator
 
 # ============================================
-# CRITICAL: Set settings module FIRST
+# Step 1: Set settings module FIRST
 # ============================================
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'smart_house_backend.settings')
 
 # ============================================
-# CRITICAL: Setup Django BEFORE importing any app modules
+# Step 2: Setup Django BEFORE importing any app modules
 # This ensures the app registry is ready
 # ============================================
 django.setup()
 
 # ============================================
-# Now import your routing modules AFTER django.setup()
+# Step 3: Import routing modules AFTER django.setup()
 # ============================================
 import devices.routing
-import activities.routing
+
+# activities.routing is optional - handle gracefully if missing
+try:
+    import activities.routing
+    has_activities_routing = True
+except ImportError:
+    has_activities_routing = False
 
 # ============================================
-# Get Django ASGI application for HTTP requests
+# Step 4: Combine URL patterns from all apps
+# ============================================
+websocket_urlpatterns = list(devices.routing.websocket_urlpatterns)
+
+if has_activities_routing:
+    websocket_urlpatterns += activities.routing.websocket_urlpatterns
+
+# ============================================
+# Step 5: Get Django ASGI application for HTTP requests
 # ============================================
 django_asgi_app = get_asgi_application()
 
 # ============================================
-# Main ASGI application with WebSocket support
+# Step 6: Main ASGI application with WebSocket support
 # ============================================
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
     "websocket": AllowedHostsOriginValidator(
         AuthMiddlewareStack(
-            URLRouter(
-                devices.routing.websocket_urlpatterns 
-               
-            )
+            URLRouter(websocket_urlpatterns)
         )
     ),
 })
