@@ -44,12 +44,12 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '0.0.0.0',
+    '*.onrender.com',
 ]
 
 # Render configuration
 if IS_RENDER:
-    ALLOWED_HOSTS.extend(['*.onrender.com'])
-    # Static files will be served from the root
+    ALLOWED_HOSTS.extend(['*.onrender.com', 'smart-house-backend-a9y4.onrender.com'])
     STATIC_URL = '/static/'
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
     
@@ -62,8 +62,6 @@ if FLY_APP_NAME:
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
-    if IS_RENDER:
-        CSRF_TRUSTED_ORIGINS = [f'https://{RENDER_EXTERNAL_HOSTNAME}']
 
 # Add Vercel domains (for compatibility)
 if os.environ.get('VERCEL') == '1':
@@ -73,8 +71,30 @@ if os.environ.get('VERCEL') == '1':
 CUSTOM_DOMAIN = os.environ.get('CUSTOM_DOMAIN')
 if CUSTOM_DOMAIN:
     ALLOWED_HOSTS.append(CUSTOM_DOMAIN)
-    CSRF_TRUSTED_ORIGINS = CSRF_TRUSTED_ORIGINS if 'CSRF_TRUSTED_ORIGINS' in locals() else []
+
+# ============================================
+# CSRF TRUSTED ORIGINS - FIX FOR REDIRECT LOOP
+# ============================================
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.onrender.com',
+    'http://*.onrender.com',
+    'https://smart-house-backend-a9y4.onrender.com',
+    'http://smart-house-backend-a9y4.onrender.com',
+]
+
+if CUSTOM_DOMAIN:
     CSRF_TRUSTED_ORIGINS.append(f'https://{CUSTOM_DOMAIN}')
+    CSRF_TRUSTED_ORIGINS.append(f'http://{CUSTOM_DOMAIN}')
+
+# ============================================
+# PROXY SETTINGS FOR RENDER - FIX FOR REDIRECT LOOP
+# ============================================
+
+# Render terminates SSL at the load balancer
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
 
 # ============================================
 # APPLICATION DEFINITION
@@ -223,7 +243,7 @@ USE_TZ = True
 # ============================================
 
 # Static files configuration (works for both Render and local)
-STATIC_URL = '/static/'  # Always use leading slash for URL routing
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Include custom static files directory if it exists
@@ -268,45 +288,57 @@ SIMPLE_JWT = {
 }
 
 # ============================================
-# CORS SETTINGS - PRODUCTION READY
+# CORS SETTINGS - FIXED FOR RENDER
 # ============================================
 
-# Base CORS settings
+# Allow all origins for WebSocket connections (for ESP32)
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+
+# Allow specific HTTP methods
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Allow specific headers for WebSocket upgrade
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'upgrade',
+    'connection',
+    'sec-websocket-key',
+    'sec-websocket-version',
+    'sec-websocket-extensions',
+]
+
+# CORS allowed origins for production
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "https://smart-house-backend-a9y4.onrender.com",
+    "http://smart-house-backend-a9y4.onrender.com",
 ]
 
-# Add production domains
-if RENDER_EXTERNAL_HOSTNAME:
-    CORS_ALLOWED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
-
-if FLY_APP_NAME:
-    CORS_ALLOWED_ORIGINS.append(f"https://{FLY_APP_NAME}.fly.dev")
-
-if CUSTOM_DOMAIN:
-    CORS_ALLOWED_ORIGINS.append(f"https://{CUSTOM_DOMAIN}")
-
-# For development, allow all origins (adjust for production)
-if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = True
-    CORS_ALLOWED_ORIGINS = []  # Clear the list when allowing all
-else:
-    # Strict CORS for production
-    CORS_ALLOW_ALL_ORIGINS = False
-
-# Allow specific regex patterns
+# Allow Render subdomains via regex
 CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"https://.*\.onrender\.com",
+    r"http://.*\.onrender\.com",
     r".*\.forestadmin\.com.*",
 ]
-
-# Add Render subdomains
-if IS_RENDER:
-    CORS_ALLOWED_ORIGIN_REGEXES.append(r"https://.*\.onrender\.com")
-
-CORS_ALLOW_CREDENTIALS = True
 
 # ============================================
 # REDIS & CACHE CONFIGURATION
@@ -358,43 +390,38 @@ else:
     }
 
 # ============================================
-# SECURITY SETTINGS
+# SECURITY SETTINGS - FIXED FOR RENDER (NO REDIRECT LOOP)
 # ============================================
 
 # WebSocket and command timeout settings
 COMMAND_TIMEOUT = 30
 
-# Security settings for production
-if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    SECURE_HSTS_SECONDS = 31536000  # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    X_FRAME_OPTIONS = 'DENY'
-    
-    # Ensure CSRF trusted origins are set
-    if 'CSRF_TRUSTED_ORIGINS' not in locals():
-        CSRF_TRUSTED_ORIGINS = []
-    
-    # Add all HTTPS origins from CORS_ALLOWED_ORIGINS
-    for origin in CORS_ALLOWED_ORIGINS:
-        if origin.startswith('https://'):
-            CSRF_TRUSTED_ORIGINS.append(origin)
-    
-    # Add regex origins that are HTTPS
-    for regex in CORS_ALLOWED_ORIGIN_REGEXES:
-        if 'https://' in regex:
-            CSRF_TRUSTED_ORIGINS.append(regex)
-else:
-    # Development security settings
+# IMPORTANT: For Render, disable SSL redirect because Render terminates SSL at load balancer
+# This prevents the redirect loop!
+if IS_RENDER:
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
-    CSRF_TRUSTED_ORIGINS = []  # Clear for development
+    SECURE_HSTS_SECONDS = 0
+    SECURE_SSL_HOST = None
+    SECURE_REDIRECT_EXEMPT = []
+else:
+    # For non-Render production environments
+    if not DEBUG:
+        SECURE_SSL_REDIRECT = True
+        SESSION_COOKIE_SECURE = True
+        CSRF_COOKIE_SECURE = True
+        SECURE_BROWSER_XSS_FILTER = True
+        SECURE_CONTENT_TYPE_NOSNIFF = True
+        SECURE_HSTS_SECONDS = 31536000
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        SECURE_HSTS_PRELOAD = True
+        X_FRAME_OPTIONS = 'DENY'
+    else:
+        # Development security settings
+        SECURE_SSL_REDIRECT = False
+        SESSION_COOKIE_SECURE = False
+        CSRF_COOKIE_SECURE = False
 
 # ============================================
 # LOGGING CONFIGURATION - RENDER OPTIMIZED
@@ -417,7 +444,7 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
-            'stream': sys.stdout,  # Render captures stdout
+            'stream': sys.stdout,
         },
     },
     'root': {
@@ -432,7 +459,7 @@ LOGGING = {
         },
         'django.db.backends': {
             'handlers': ['console'],
-            'level': 'ERROR',  # Reduce SQL log noise in production
+            'level': 'ERROR',
             'propagate': False,
         },
         'django.channels': {
@@ -463,16 +490,12 @@ LOGGING = {
 # ============================================
 
 if 'test' in sys.argv or 'pytest' in sys.argv[0]:
-    # Use SQLite for tests
     DATABASES['default'] = {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'test_db.sqlite3',
     }
-    # Disable caching for tests
     CACHES['default']['BACKEND'] = 'django.core.cache.backends.dummy.DummyCache'
-    # Use in-memory channel layer for tests
     CHANNEL_LAYERS['default']['BACKEND'] = 'channels.layers.InMemoryChannelLayer'
-    # Disable security for tests
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
@@ -481,7 +504,6 @@ if 'test' in sys.argv or 'pytest' in sys.argv[0]:
 # HEALTH CHECK SETTINGS FOR RENDER
 # ============================================
 
-# Render health check endpoint (if you add it to urls.py)
 HEALTH_CHECK_ENABLED = IS_RENDER
 
 print(f"=== Django Settings ===")
@@ -490,48 +512,5 @@ print(f"Running on Render: {IS_RENDER}")
 print(f"Allowed hosts: {ALLOWED_HOSTS}")
 print(f"Database engine: {DATABASES['default'].get('ENGINE', 'unknown')}")
 print(f"Static root: {STATIC_ROOT}")
+print(f"SSL Redirect: {SECURE_SSL_REDIRECT}")
 print(f"========================")
-
-
-# ==================== CORS SETTINGS FOR ESP32 WEBSOCKET ====================
-# Allow all origins for WebSocket connections (for ESP32)
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
-
-# Allow specific HTTP methods
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-
-# Allow specific headers for WebSocket upgrade
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-    'upgrade',
-    'connection',
-    'sec-websocket-key',
-    'sec-websocket-version',
-    'sec-websocket-extensions',
-]
-
-# For WebSocket connections
-ASGI_APPLICATION = 'smart_house_backend.asgi.application'
-
-# Channel layers for WebSocket (use in-memory for testing)
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    },
-}
