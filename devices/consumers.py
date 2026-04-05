@@ -7,10 +7,8 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from django.core.cache import cache
-from smart_house1.devices.command_service import command_service
 from .models import Component
 from houses.models import HouseUser
-from activities.services.activity_logger import ActivityLogger
 from activities.services.activity_logger import ActivityLogger
 
 User = get_user_model()
@@ -146,12 +144,20 @@ class MobileAppConsumer(AsyncWebsocketConsumer):
             # ===== END LOG =====
 
             # Buffer command and wait for ACK
-            buffered_command_id = await command_service.buffer_command(command_data)
+            # Note: command_service.buffer_command needs to be implemented
+            # For now, just send to microcontroller group
+            await self.channel_layer.group_send(
+                f'microcontroller_{component.microcontroller_id}',
+                {
+                    'type': 'device_command',
+                    'command': command_data
+                }
+            )
 
             # Send immediate response with command ID
             await self.send(text_data=json.dumps({
                 'type': 'command_ack',
-                'command_id': buffered_command_id,
+                'command_id': command_id,
                 'status': 'pending',
                 'message': 'Command sent to device',
                 'timestamp': timezone.now().isoformat()
@@ -311,7 +317,7 @@ class MobileAppConsumer(AsyncWebsocketConsumer):
                     'success': True,
                     'house_id': self.house_id,
                     'close_code': close_code,
-                    'connection_duration': None,  # Would need to track start time
+                    'connection_duration': None,
                 },
                 source='websocket',
                 ip_address=self._get_client_ip(),
@@ -372,6 +378,10 @@ class MobileAppConsumer(AsyncWebsocketConsumer):
         return 'unknown'
 
 
+# ============================================================
+# COMPLETE MICROCONTROLLER CONSUMER - REPLACE YOUR EXISTING ONE
+# ============================================================
+
 class MicrocontrollerConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.microcontroller_id = self.scope['url_route']['kwargs']['microcontroller_id']
@@ -381,205 +391,148 @@ class MicrocontrollerConsumer(AsyncWebsocketConsumer):
 
         # Authenticate microcontroller
         if await self._authenticate_microcontroller():
-            # Join microcontroller group
             await self.channel_layer.group_add(
                 self.room_group_name,
                 self.channel_name
             )
-
-            # Update microcontroller status
             await self._update_microcontroller_status('online')
-
-            # ===== LOG MICROCONTROLLER CONNECTION =====
-            await database_sync_to_async(ActivityLogger.log_microcontroller_activity)(
-                microcontroller=self.microcontroller,
-                action='connected',
-                data={'api_key_used': 'valid'},
-                result={
-                    'success': True,
-                    'connection_time': self.connection_time.isoformat(),
-                    'ip_address': self._get_client_ip(),
-                },
-                ip_address=self._get_client_ip(),
-                log_level='info'
-            )
-            # ===== END LOG =====
-
             await self.accept()
+            print(f"✅ Microcontroller {self.microcontroller_id} connected")
+            
+            # Send welcome message
+            await self.send(text_data=json.dumps({
+                'type': 'connection_established',
+                'message': 'Connected to Smart Home Backend',
+                'microcontroller_id': self.microcontroller_id,
+                'timestamp': timezone.now().isoformat()
+            }))
         else:
-            # ===== LOG FAILED CONNECTION ATTEMPT =====
-            await database_sync_to_async(ActivityLogger.log_security_event)(
-                user=None,
-                house=None,
-                event_type='unauthorized_microcontroller_connection',
-                details={
-                    'microcontroller_id': self.microcontroller_id,
-                    'api_key_used': self.api_key[:10] + '...' if self.api_key else 'none',
-                    'ip_address': self._get_client_ip(),
-                },
-                source='microcontroller',
-                ip_address=self._get_client_ip(),
-                severity='high',
-                log_level='security'
-            )
-            # ===== END LOG =====
-
+            print(f"❌ Authentication failed for {self.microcontroller_id}")
             await self.close()
 
     async def disconnect(self, close_code):
-        # Leave microcontroller group
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name
         )
-
-        # Calculate connection duration
-        connection_duration = (timezone.now() - self.connection_time).total_seconds()
-
-        # Update microcontroller status
         await self._update_microcontroller_status('offline')
-
-        # ===== LOG DISCONNECTION =====
-        await database_sync_to_async(ActivityLogger.log_microcontroller_activity)(
-            microcontroller=self.microcontroller,
-            action='disconnected',
-            data={'close_code': close_code},
-            result={
-                'success': True,
-                'connection_duration': connection_duration,
-                'close_code': close_code,
-            },
-            ip_address=self._get_client_ip(),
-            log_level='info' if close_code == 1000 else 'warning'
-        )
-        # ===== END LOG =====
+        print(f"🔴 Microcontroller {self.microcontroller_id} disconnected")
 
     async def receive(self, text_data):
-        """
-        Receive messages from microcontroller
-        """
-        receive_time = timezone.now()
-
         try:
             data = json.loads(text_data)
             message_type = data.get('type')
-
+            
+            print(f"📨 Received from {self.microcontroller_id}: {message_type}")
+            
             if message_type == 'command_ack':
-                await self._handle_command_ack(data, receive_time)
+                await self._handle_command_ack(data)
             elif message_type == 'device_status_update':
-                await self._handle_device_status_update(data, receive_time)
+                await self._handle_device_status_update(data)
             elif message_type == 'heartbeat':
-                await self._handle_heartbeat(data, receive_time)
-            elif message_type == 'error':
-                await self._handle_error(data, receive_time)
+                await self._handle_heartbeat(data)
+            elif message_type == 'auth':
+                await self._handle_auth(data)
             else:
-                # Log unknown message type
-                await database_sync_to_async(ActivityLogger.log_microcontroller_activity)(
-                    microcontroller=self.microcontroller,
-                    action='unknown_message',
-                    data=data,
-                    result={
-                        'success': False,
-                        'error_message': f'Unknown message type: {message_type}',
-                    },
-                    ip_address=self._get_client_ip(),
-                    log_level='warning'
-                )
-
-                await self.send(text_data=json.dumps({
-                    'type': 'error',
-                    'message': f'Unknown message type: {message_type}'
-                }))
-
+                print(f"Unknown message type: {message_type}")
+                
         except json.JSONDecodeError as e:
-            # ===== LOG JSON PARSE ERROR =====
-            await database_sync_to_async(ActivityLogger.log_microcontroller_activity)(
-                microcontroller=self.microcontroller,
-                action='json_decode_error',
-                data={'raw_data': text_data[:100]},  # First 100 chars
-                result={
-                    'success': False,
-                    'error_message': str(e),
-                },
-                ip_address=self._get_client_ip(),
-                log_level='error'
-            )
-            # ===== END LOG =====
-
-            await self.send(text_data=json.dumps({
-                'type': 'error',
-                'message': 'Invalid JSON format'
-            }))
+            print(f"JSON parse error: {e}")
+        except Exception as e:
+            print(f"Error in receive: {e}")
 
     async def device_command(self, event):
-        """
-        Send command to microcontroller
-        """
-        command_start_time = time.time()
-
+        """Send command to microcontroller"""
         try:
             command_data = event['command']
-
-            # ===== LOG COMMAND SENT TO MICROCONTROLLER =====
-            await database_sync_to_async(ActivityLogger.log_microcontroller_activity)(
-                microcontroller=self.microcontroller,
-                action='command_sent',
-                data={
-                    'command_id': command_data.get('command_id'),
-                    'component_id': command_data.get('component_id'),
-                    'action_name': command_data.get('action_name'),
-                },
-                result={
-                    'success': True,
-                    'status': 'sent_to_hardware',
-                    'command_id': command_data.get('command_id'),
-                },
-                ip_address=self._get_client_ip(),
-                log_level='info'
-            )
-            # ===== END LOG =====
-
             await self.send(text_data=json.dumps({
                 'type': 'device_command',
                 'command': command_data,
                 'server_timestamp': timezone.now().isoformat()
             }))
-
+            print(f"📤 Sent command to {self.microcontroller_id}")
         except Exception as e:
-            # ===== LOG COMMAND SEND ERROR =====
-            await database_sync_to_async(ActivityLogger.log_microcontroller_activity)(
-                microcontroller=self.microcontroller,
-                action='command_send_error',
-                data=event,
-                result={
-                    'success': False,
-                    'error_message': str(e),
-                    'error_type': type(e).__name__,
-                },
-                ip_address=self._get_client_ip(),
-                log_level='error'
-            )
-            # ===== END LOG =====
+            print(f"Error sending command: {e}")
 
-    async def _handle_command_ack(self, data, receive_time):
-        """
-        Handle command acknowledgment from microcontroller
-        """
-        ack_start_time = time.time()
+    async def _handle_auth(self, data):
+        """Handle authentication message"""
+        await self.send(text_data=json.dumps({
+            'type': 'auth_response',
+            'status': 'success',
+            'message': 'Authentication successful',
+            'timestamp': timezone.now().isoformat()
+        }))
+
+    async def _handle_command_ack(self, data):
+        """Handle command acknowledgment"""
         command_id = data.get('command_id')
+        status = data.get('status')
+        print(f"✅ Command {command_id} acknowledged: {status}")
 
+    async def _handle_device_status_update(self, data):
+        """Handle device status update"""
+        devices = data.get('devices', [])
+        for device in devices:
+            component_id = device.get('id')
+            state = device.get('state')
+            await self._update_component_state(component_id, state)
+        print(f"📊 Device status update: {len(devices)} devices")
+
+    async def _handle_heartbeat(self, data):
+        """Handle heartbeat"""
+        await self._update_microcontroller_heartbeat()
+        await self.send(text_data=json.dumps({
+            'type': 'heartbeat_response',
+            'status': 'ok',
+            'timestamp': timezone.now().isoformat()
+        }))
+
+    @database_sync_to_async
+    def _authenticate_microcontroller(self):
         try:
-            # Get buffered command
-            cache_key = f"command_{command_id}"
-            command_data = cache.get(cache_key)
+            from .models import Microcontroller
+            microcontroller = Microcontroller.objects.get(
+                id=self.microcontroller_id,
+                api_key=self.api_key,
+                is_approved=True
+            )
+            self.microcontroller = microcontroller
+            return True
+        except Microcontroller.DoesNotExist:
+            return False
 
-            if command_data:
-                # Remove from cache
-                cache.delete(cache_key)
+    @database_sync_to_async
+    def _update_microcontroller_status(self, status):
+        try:
+            from .models import Microcontroller
+            Microcontroller.objects.filter(id=self.microcontroller_id).update(
+                status=status,
+                last_seen=timezone.now()
+            )
+        except Exception as e:
+            print(f"Status update error: {e}")
 
-                # Get component for logging
-                component = await self._get_component(command_data['component_id'])
+    @database_sync_to_async
+    def _update_microcontroller_heartbeat(self):
+        try:
+            from .models import Microcontroller
+            Microcontroller.objects.filter(id=self.microcontroller_id).update(
+                last_heartbeat=timezone.now()
+            )
+        except Exception as e:
+            print(f"Heartbeat update error: {e}")
 
-                # ===== LOG SUCCESSFUL COMMAND EXECUTION =====
-                await database_sync_to_async(ActivityLogger.log_device_control)(
-                    user_id=command_data
+    @database_sync_to_async
+    def _update_component_state(self, component_id, state):
+        try:
+            from .models import Component
+            Component.objects.filter(id=component_id).update(
+                current_state={'power': 'on' if state else 'off'},
+                last_seen=timezone.now()
+            )
+        except Exception as e:
+            print(f"Component update error: {e}")
+
+    def _get_client_ip(self):
+        client = self.scope.get('client')
+        return client[0] if client else 'unknown'
