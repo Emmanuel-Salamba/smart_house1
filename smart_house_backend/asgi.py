@@ -9,7 +9,6 @@ import django
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
-from channels.security.websocket import AllowedHostsOriginValidator
 
 # ============================================
 # Step 1: Set settings module FIRST
@@ -50,12 +49,14 @@ django_asgi_app = get_asgi_application()
 # ============================================
 # Step 6: Main ASGI application with WebSocket support
 # ============================================
+# Note: We don't use AllowedHostsOriginValidator for WebSocket because:
+# 1. Microcontrollers (ESP32) don't send proper origin headers
+# 2. wscat and embedded clients may not comply with origin restrictions
+# 3. Authentication is handled by the consumer's API key validation
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
-    "websocket": AllowedHostsOriginValidator(
-        AuthMiddlewareStack(
-            URLRouter(websocket_urlpatterns)
-        )
+    "websocket": AuthMiddlewareStack(
+        URLRouter(websocket_urlpatterns)
     ),
 })
 
