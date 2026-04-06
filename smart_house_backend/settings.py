@@ -370,7 +370,18 @@ CACHES = {
 # ============================================
 
 # Use Redis if available, otherwise in-memory for development
-
+if REDIS_URL and REDIS_URL != 'redis://localhost:6379':
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [REDIS_URL],
+                'capacity': 1500,
+                'expiry': 10,
+            },
+        },
+    }
+else:
     # Development/fallback channel layer
     CHANNEL_LAYERS = {
         'default': {
