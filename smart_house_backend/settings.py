@@ -384,10 +384,10 @@ if REDIS_URL and REDIS_URL != 'redis://localhost:6379':
 else:
     # Development/fallback channel layer
     CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels.layers.InMemoryChannelLayer'
-        }
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
     }
+}
 
 # ============================================
 # SECURITY SETTINGS - FIXED FOR RENDER (NO REDIRECT LOOP)
