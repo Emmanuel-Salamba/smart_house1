@@ -35,12 +35,10 @@ for i in {1..3}; do
     fi
 done
 
-# Start gunicorn regardless of database status
-echo "Starting gunicorn..."
-exec gunicorn smart_house_backend.wsgi:application \
-    --bind 0.0.0.0:$PORT \
-    --workers 3 \
-    --worker-class sync \
-    --timeout 120 \
-    --access-logfile - \
-    --error-logfile -
+# Start Daphne for ASGI/Channels support regardless of database status
+echo "Starting daphne..."
+exec daphne smart_house_backend.asgi:application \
+    --bind 0.0.0.0 \
+    --port $PORT \
+    --access-log - \
+    --proxy-headers
