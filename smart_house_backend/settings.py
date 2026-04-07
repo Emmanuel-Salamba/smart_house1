@@ -396,6 +396,7 @@ if REDIS_URL and REDIS_URL != 'redis://localhost:6379' and redis_host_resolves(R
             },
         },
     }
+    print(f"✅ CHANNELS: Using Redis at {REDIS_URL}")
 else:
     # Development/fallback channel layer
     CHANNEL_LAYERS = {
@@ -403,6 +404,7 @@ else:
             'BACKEND': 'channels.layers.InMemoryChannelLayer'
         }
     }
+    print(f"⚠️  CHANNELS: Using InMemoryChannelLayer (Redis unavailable: REDIS_URL={REDIS_URL})")
 
 # ============================================
 # SECURITY SETTINGS - FIXED FOR RENDER (NO REDIRECT LOOP)
