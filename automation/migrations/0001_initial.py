@@ -52,7 +52,7 @@ class Migration(migrations.Migration):
                 ('description', models.TextField(blank=True)),
                 ('action_parameters', models.JSONField(default=dict)),
                 ('scheduled_time', models.TimeField()),
-                ('start_date', models.DateField(default=django.utils.timezone.now)),
+                ('start_date', models.DateField(auto_now_add=True)),
                 ('end_date', models.DateField(blank=True, null=True)),
                 ('recurrence', models.CharField(choices=[('once', 'Once'), ('daily', 'Daily'), ('weekly', 'Weekly'), ('monthly', 'Monthly'), ('weekdays', 'Weekdays'), ('weekends', 'Weekends'), ('custom', 'Custom')], default='daily', max_length=20)),
                 ('days_of_week', models.JSONField(blank=True, default=list)),

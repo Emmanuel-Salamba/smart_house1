@@ -6,6 +6,7 @@ from devices.views import ComponentViewSet, MicrocontrollerViewSet, ActionTypeVi
 from django.http import JsonResponse
 from django.db import connection
 from django.db.utils import OperationalError
+from django.utils import timezone
 
 
 def health_check(request):

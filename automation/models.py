@@ -40,7 +40,7 @@ class Schedule(models.Model):
     # Schedule configuration
     action_parameters = models.JSONField(default=dict)  # Parameters for the action
     scheduled_time = models.TimeField()
-    start_date = models.DateField(default=timezone.now)
+    start_date = models.DateField(auto_now_add=True)
     end_date = models.DateField(null=True, blank=True)
     recurrence = models.CharField(max_length=20, choices=RECURRENCE_CHOICES, default='daily')
     
