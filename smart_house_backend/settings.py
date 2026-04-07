@@ -347,9 +347,9 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 # Get Redis URL (Render Redis addon provides REDIS_URL)
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 
-# Fix Redis URL format if needed
-if REDIS_URL and not REDIS_URL.startswith('redis://'):
-    REDIS_URL = f'redis://{REDIS_URL}:6379'
+# Normalize Redis URL: preserve schemes like redis:// or rediss://, otherwise add redis://
+if REDIS_URL and '://' not in REDIS_URL:
+    REDIS_URL = f'redis://{REDIS_URL}'
 
 # Cache configuration
 CACHES = {

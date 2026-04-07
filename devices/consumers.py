@@ -1,6 +1,7 @@
 import json
 import uuid
 import time
+import traceback
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
@@ -140,24 +141,29 @@ class MicrocontrollerConsumer(AsyncWebsocketConsumer):
         print(f"   Microcontroller ID: {self.microcontroller_id}")
         print(f"   API Key: {self.api_key}")
 
-        # Authenticate microcontroller
-        if await self._authenticate_microcontroller():
-            await self.channel_layer.group_add(
-                self.room_group_name,
-                self.channel_name
-            )
-            await self.accept()
-            print(f"✅ Microcontroller {self.microcontroller_id} CONNECTED successfully!")
-            
-            # Send welcome message
-            await self.send(text_data=json.dumps({
-                'type': 'connection_established',
-                'message': 'Connected to Smart Home Backend',
-                'microcontroller_id': self.microcontroller_id,
-                'timestamp': timezone.now().isoformat()
-            }))
-        else:
-            print(f"❌ Microcontroller {self.microcontroller_id} AUTHENTICATION FAILED!")
+        try:
+            # Authenticate microcontroller
+            if await self._authenticate_microcontroller():
+                await self.channel_layer.group_add(
+                    self.room_group_name,
+                    self.channel_name
+                )
+                await self.accept()
+                print(f"✅ Microcontroller {self.microcontroller_id} CONNECTED successfully!")
+                
+                # Send welcome message
+                await self.send(text_data=json.dumps({
+                    'type': 'connection_established',
+                    'message': 'Connected to Smart Home Backend',
+                    'microcontroller_id': self.microcontroller_id,
+                    'timestamp': timezone.now().isoformat()
+                }))
+            else:
+                print(f"❌ Microcontroller {self.microcontroller_id} AUTHENTICATION FAILED!")
+                await self.close()
+        except Exception as e:
+            print(f"❌ Microcontroller connect error: {e}")
+            traceback.print_exc()
             await self.close()
 
     async def disconnect(self, close_code):
