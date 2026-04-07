@@ -3,6 +3,8 @@ import dj_database_url
 from pathlib import Path
 from datetime import timedelta
 import sys
+import socket
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -351,6 +353,19 @@ REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 if REDIS_URL and '://' not in REDIS_URL:
     REDIS_URL = f'redis://{REDIS_URL}'
 
+# Helper to determine whether the Redis host resolves
+def redis_host_resolves(redis_url):
+    try:
+        parsed = urlparse(redis_url)
+        host = parsed.hostname
+        port = parsed.port or 6379
+        if not host:
+            return False
+        socket.getaddrinfo(host, port)
+        return True
+    except Exception:
+        return False
+
 # Cache configuration
 CACHES = {
     'default': {
@@ -369,8 +384,8 @@ CACHES = {
 # CHANNELS & WEBSOCKET CONFIGURATION
 # ============================================
 
-# Use Redis if available, otherwise in-memory for development
-if REDIS_URL and REDIS_URL != 'redis://localhost:6379':
+# Use Redis if available, otherwise in-memory for development/fallback
+if REDIS_URL and REDIS_URL != 'redis://localhost:6379' and redis_host_resolves(REDIS_URL):
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
