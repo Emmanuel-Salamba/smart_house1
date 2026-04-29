@@ -31,7 +31,7 @@ class ActivityLog(models.Model):
 
     # Relationships
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
-    house = models.ForeignKey(House, on_delete=models.CASCADE, related_name='activities')
+    house = models.ForeignKey(House, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
     component = models.ForeignKey(Component, on_delete=models.SET_NULL, null=True, blank=True,
                                   related_name='activities')
     action_type = models.ForeignKey(ActionType, on_delete=models.PROTECT, null=True, blank=True,
@@ -79,7 +79,8 @@ class ActivityLog(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.action_name} - {self.house.name} - {self.created_at}"
+        house_name = self.house.name if self.house else "Deleted House"
+        return f"{self.action_name} - {house_name} - {self.created_at}"
 
 
 class SecurityEvent(models.Model):
@@ -108,7 +109,7 @@ class SecurityEvent(models.Model):
 
     # Related entities
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='security_events')
-    house = models.ForeignKey(House, on_delete=models.CASCADE, null=True, blank=True, related_name='security_events')
+    house = models.ForeignKey(House, on_delete=models.SET_NULL, null=True, blank=True, related_name='security_events')
     component = models.ForeignKey(Component, on_delete=models.SET_NULL, null=True, blank=True,
                                   related_name='security_events')
 

@@ -132,6 +132,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    #'users.middleware.CurrentUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -204,11 +205,18 @@ if database_url:
             }
         }
 else:
-    # Development database
+    # ============================================
+    # LOCAL DEVELOPMENT DATABASE - POSTGRESQL
+    # ============================================
+    # Use PostgreSQL for local development to match production
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'smart_house_db',
+            'USER': 'postgres',
+            'PASSWORD': 'esther1234',
+            'HOST': 'localhost',
+            'PORT': '5432',
         }
     }
 
