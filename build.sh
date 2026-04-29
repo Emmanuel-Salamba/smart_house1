@@ -10,16 +10,19 @@ python manage.py collectstatic --noinput
 # Apply database migrations
 python manage.py migrate --noinput
 
-# ALWAYS create superuser (no condition needed)
+# Create superuser using EMAIL from environment variables
 echo "Creating superuser..."
 python manage.py shell << EOF
 from django.contrib.auth import get_user_model;
+import os;
 User = get_user_model();
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@example.com', 'admin123')
-    print('Superuser created! Password: admin123')
+email = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@example.com');
+password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'admin123');
+if not User.objects.filter(email=email).exists():
+    User.objects.create_superuser(email=email, password=password)
+    print(f"Superuser created! Email: {email}")
 else:
-    print('Superuser already exists')
+    print(f"Superuser with email {email} already exists")
 EOF
 
 echo "=== Build Complete ==="
