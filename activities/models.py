@@ -27,9 +27,18 @@ class ActivityLog(models.Model):
         ('system', 'System'),
     ]
 
+    DEVICE_PLATFORMS = [
+        ('ios', 'iOS'),
+        ('android', 'Android'),
+        ('web', 'Web Browser'),
+        ('esp32', 'ESP32 Microcontroller'),
+        ('api', 'API Call'),
+        ('unknown', 'Unknown'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
-    # Relationships
+    # ========== EXISTING RELATIONSHIPS ==========
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
     house = models.ForeignKey(House, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
     component = models.ForeignKey(Component, on_delete=models.SET_NULL, null=True, blank=True,
@@ -37,30 +46,65 @@ class ActivityLog(models.Model):
     action_type = models.ForeignKey(ActionType, on_delete=models.PROTECT, null=True, blank=True,
                                     related_name='activities')
 
-    # Action details
+    # ========== ACTION DETAILS ==========
     action_name = models.CharField(max_length=100)
     action_parameters = models.JSONField(default=dict, encoder=DjangoJSONEncoder)
     action_result = models.JSONField(default=dict, encoder=DjangoJSONEncoder)
 
-    # Log metadata
+    # ========== LOG METADATA ==========
     log_level = models.CharField(max_length=10, choices=LOG_LEVELS, default='info')
     source = models.CharField(max_length=20, choices=SOURCE_TYPES, default='api')
 
     is_automated = models.BooleanField(default=False)
     automation_source = models.CharField(max_length=100, blank=True)
-    # Technical details
+
+    # ========== TECHNICAL DETAILS ==========
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(blank=True)
     request_path = models.CharField(max_length=500, blank=True)
 
-    # Performance metrics (optional)
-    execution_time = models.FloatField(null=True, blank=True)  # in seconds
-    memory_usage = models.IntegerField(null=True, blank=True)  # in bytes
+    # ========== NEW: TRACKING & CORRELATION ==========
+    session_id = models.CharField(max_length=100, blank=True, default='', db_index=True,
+                                   help_text="User session ID for tracking user journey")
+    request_id = models.CharField(max_length=100, blank=True, db_index=True,
+                                   help_text="Unique request ID for correlating related log entries")
 
-    # Status
-    status_code = models.IntegerField(null=True, blank=True)  # HTTP status or custom code
+    # ========== NEW: PERFORMANCE METRICS ==========
+    duration_ms = models.IntegerField(null=True, blank=True,
+                                       help_text="Action duration in milliseconds")
 
-    # Timestamps
+    # ========== NEW: USER CONTEXT ==========
+    household_member_id = models.UUIDField(null=True, blank=True,
+                                            help_text="Which household member performed the action")
+
+    # ========== NEW: CLIENT INFORMATION ==========
+    device_platform = models.CharField(max_length=20, choices=DEVICE_PLATFORMS, default='unknown',
+                                        help_text="Platform the action came from")
+    app_version = models.CharField(max_length=20, blank=True,
+                                    help_text="Mobile app version (e.g., 1.2.3)")
+    firmware_version = models.CharField(max_length=20, blank=True,
+                                         help_text="ESP32 firmware version")
+
+    # ========== NEW: GEOLOCATION (if user permits) ==========
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True,
+                                    help_text="Latitude of the user/device")
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True,
+                                     help_text="Longitude of the user/device")
+
+    # ========== NEW: BUSINESS METRICS ==========
+    subscription_tier = models.CharField(max_length=20, blank=True,
+                                          help_text="User's subscription plan (free, basic, premium, enterprise)")
+    is_billable = models.BooleanField(default=True,
+                                       help_text="Whether this action counts toward billing/usage limits")
+
+    # ========== EXISTING PERFORMANCE METRICS ==========
+    execution_time = models.FloatField(null=True, blank=True)
+    memory_usage = models.IntegerField(null=True, blank=True)
+
+    # ========== STATUS ==========
+    status_code = models.IntegerField(null=True, blank=True)
+
+    # ========== TIMESTAMPS ==========
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -75,11 +119,17 @@ class ActivityLog(models.Model):
             models.Index(fields=['created_at']),
             models.Index(fields=['log_level', 'created_at']),
             models.Index(fields=['source', 'created_at']),
+            # NEW INDEXES
+            models.Index(fields=['session_id', 'created_at']),
+            models.Index(fields=['request_id']),
+            models.Index(fields=['device_platform', 'created_at']),
+            models.Index(fields=['subscription_tier', 'created_at']),
+            models.Index(fields=['is_billable', 'created_at']),
         ]
         ordering = ['-created_at']
 
     def __str__(self):
-        house_name = self.house.name if self.house else "Deleted House"
+        house_name = self.house.name if self.house else "Unknown House"
         return f"{self.action_name} - {house_name} - {self.created_at}"
 
 
@@ -118,6 +168,9 @@ class SecurityEvent(models.Model):
     user_agent = models.TextField(blank=True)
     request_path = models.CharField(max_length=500, blank=True)
 
+    # NEW: Session tracking for security events
+    session_id = models.CharField(max_length=100, blank=True, default='', db_index=True)
+
     # Resolution
     is_resolved = models.BooleanField(default=False)
     resolved_at = models.DateTimeField(null=True, blank=True)
@@ -135,8 +188,10 @@ class SecurityEvent(models.Model):
             models.Index(fields=['event_type', 'created_at']),
             models.Index(fields=['severity', 'created_at']),
             models.Index(fields=['is_resolved', 'created_at']),
+            models.Index(fields=['session_id', 'created_at']),
         ]
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.event_type} - {self.severity} - {self.created_at}"
+        house_name = self.house.name if self.house else "Unknown House"
+        return f"{self.event_type} - {house_name} - {self.created_at}"

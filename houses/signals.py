@@ -4,6 +4,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 from .models import House
 from activities.models import ActivityLog
+from users.middleware import get_current_user
 
 # Store original state before update
 @receiver(pre_save, sender=House)
@@ -19,11 +20,14 @@ def store_house_original_state(sender, instance, **kwargs):
 
 @receiver(post_save, sender=House)
 def log_house_creation_or_update(sender, instance, created, **kwargs):
-    """Log when a house is created or updated"""
+    """Log when a house is created or updated with the current user"""
+    # Get the current logged-in user from middleware
+    current_user = get_current_user()
     
     if created:
         # Log house creation
         ActivityLog.objects.create(
+            user=current_user,  # ✅ NOW CAPTURES WHO CREATED
             action_name='house_created',
             house=instance,
             action_parameters={
@@ -33,12 +37,15 @@ def log_house_creation_or_update(sender, instance, created, **kwargs):
             },
             action_result={
                 'success': True,
-                'message': f'House "{instance.name}" was created',
+                'message': f'House "{instance.name}" was created by {current_user.email if current_user else "Unknown"}',
                 'house_id': str(instance.id),
             },
             log_level='info',
-            source='admin'
+            source='admin',
+            device_platform='web',
+            is_billable=False,
         )
+        print(f"✅ House creation logged by: {current_user.email if current_user else 'Unknown'}")
     else:
         # Log house update (if anything changed)
         changes = {}
@@ -54,6 +61,7 @@ def log_house_creation_or_update(sender, instance, created, **kwargs):
         
         if changes:
             ActivityLog.objects.create(
+                user=current_user,  # ✅ NOW CAPTURES WHO UPDATED
                 action_name='house_updated',
                 house=instance,
                 action_parameters={
@@ -63,19 +71,26 @@ def log_house_creation_or_update(sender, instance, created, **kwargs):
                 },
                 action_result={
                     'success': True,
-                    'message': f'House "{instance.name}" was updated',
+                    'message': f'House "{instance.name}" was updated by {current_user.email if current_user else "Unknown"}',
                     'updated_fields': list(changes.keys()),
                 },
                 log_level='info',
-                source='admin'
+                source='admin',
+                device_platform='web',
+                is_billable=False,
             )
+            print(f"✅ House update logged by: {current_user.email if current_user else 'Unknown'}")
 
 @receiver(post_delete, sender=House)
 def log_house_deletion(sender, instance, **kwargs):
-    """Log when a house is deleted"""
+    """Log when a house is deleted with the current user"""
+    # Get the current logged-in user from middleware
+    current_user = get_current_user()
+    
     ActivityLog.objects.create(
+        user=current_user,  # ✅ NOW CAPTURES WHO DELETED
         action_name='house_deleted',
-        house=None,  # This is now allowed because we changed to SET_NULL
+        house=None,  # House is being deleted, so set to None
         action_parameters={
             'house_id': str(instance.id),
             'name': instance.name,
@@ -84,8 +99,11 @@ def log_house_deletion(sender, instance, **kwargs):
         },
         action_result={
             'success': True,
-            'message': f'House "{instance.name}" was deleted',
+            'message': f'House "{instance.name}" was deleted by {current_user.email if current_user else "Unknown"}',
         },
         log_level='warning',
-        source='admin'
+        source='admin',
+        device_platform='web',
+        is_billable=False,
     )
+    print(f"✅ House deletion logged by: {current_user.email if current_user else 'Unknown'}")

@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils import timezone
 from .models import ActivityLog, SecurityEvent
 
 
@@ -10,17 +11,24 @@ class ActivityLogAdmin(admin.ModelAdmin):
         'user',
         'component',
         'log_level',
+        'ip_address',
+        'session_id',           # NEW
+        'device_platform',
+        'duration_ms',      # NEW
+        'is_billable',          # NEW
         'is_automated',
         'created_at',
-        'source'  # ADDED
+        'source'
     )
     list_filter = (
         'log_level',
         'is_automated',
+        'is_billable',          # NEW
+        'device_platform',      # NEW
         'created_at',
         'house',
         'action_type',
-        'source'  # ADDED
+        'source'
     )
     search_fields = (
         'action_name',
@@ -29,12 +37,14 @@ class ActivityLogAdmin(admin.ModelAdmin):
         'user__last_name',
         'house__name',
         'component__name',
-        'ip_address'
+        'ip_address',
+        'session_id',           # NEW
+        'request_id'            # NEW
     )
-    readonly_fields = ('created_at', 'updated_at')  # ADDED updated_at
+    readonly_fields = ('created_at', 'updated_at')
     date_hierarchy = 'created_at'
 
-    # ADD THESE PERMISSION METHODS FOR SECURITY:
+    # Permission methods for security:
     def has_add_permission(self, request):
         """Prevent manual creation of activity logs"""
         return False
@@ -55,8 +65,8 @@ class ActivityLogAdmin(admin.ModelAdmin):
                 'action_parameters',
                 'action_result',
                 'log_level',
-                'source',  # ADDED
-                'status_code'  # ADDED
+                'source',
+                'status_code'
             )
         }),
         ('Related Entities', {
@@ -73,9 +83,31 @@ class ActivityLogAdmin(admin.ModelAdmin):
                 'request_path',
                 'is_automated',
                 'automation_source',
-                'execution_time',  # ADDED
-                'memory_usage'  # ADDED if you want to show it
+                'execution_time',
+                'memory_usage'
             )
+        }),
+        ('Tracking & Correlation', {          # NEW SECTION
+            'fields': (
+                'session_id',
+                'request_id',
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Client Information', {              # NEW SECTION
+            'fields': (
+                'device_platform',
+                'app_version',
+                'firmware_version',
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Business Metrics', {                # NEW SECTION
+            'fields': (
+                'is_billable',
+                'subscription_tier',
+            ),
+            'classes': ('collapse',)
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at')
@@ -87,7 +119,7 @@ class ActivityLogAdmin(admin.ModelAdmin):
         queryset = queryset.select_related('user', 'house', 'component', 'action_type')
         return queryset
 
-    # OPTIONAL: Add custom column for action_parameters preview
+    # Optional: Add custom column for action_parameters preview
     def action_params_preview(self, obj):
         """Show a preview of action parameters"""
         params = obj.action_parameters
@@ -105,6 +137,8 @@ class SecurityEventAdmin(admin.ModelAdmin):
         'severity',
         'house',
         'user',
+        'ip_address',
+        'session_id',           # NEW
         'is_resolved',
         'created_at'
     )
@@ -124,9 +158,10 @@ class SecurityEventAdmin(admin.ModelAdmin):
         'house__name',
         'component__name',
         'ip_address',
-        'request_path'
+        'request_path',
+        'session_id'            # NEW
     )
-    readonly_fields = ('created_at', 'resolved_at')  # ADDED resolved_at
+    readonly_fields = ('created_at', 'resolved_at')
     date_hierarchy = 'created_at'
 
     fieldsets = (
@@ -150,6 +185,10 @@ class SecurityEventAdmin(admin.ModelAdmin):
                 'user_agent',
                 'request_path'
             )
+        }),
+        ('Tracking', {                        # NEW SECTION
+            'fields': ('session_id',),
+            'classes': ('collapse',)
         }),
         ('Resolution', {
             'fields': (
@@ -175,13 +214,13 @@ class SecurityEventAdmin(admin.ModelAdmin):
         updated = queryset.update(
             is_resolved=True,
             resolved_by=request.user,
-            resolved_at=timezone.now()  # ADD THIS
+            resolved_at=timezone.now()
         )
         self.message_user(request, f'{updated} security events marked as resolved.')
 
     mark_as_resolved.short_description = "Mark selected security events as resolved"
 
-    # ADD PERMISSION METHODS FOR SECURITY:
+    # Permission methods for security:
     def has_add_permission(self, request):
         """Allow adding security events (for testing/admin)"""
         return True
